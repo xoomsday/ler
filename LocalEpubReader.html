@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local ePUB Reader</title>
+  <link rel="stylesheet" href="ler.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="LER.svg">
+</head>
+<body>
+  <h1>Local ePUB Reader</h1>
+
+  <div id="book-management">
+    <h2>Book Management</h2>
+    <label for="epub-upload">Add a new book:</label>
+    <input type="file" id="epub-upload" accept=".epub">
+    <div id="book-list"></div>
+  </div>
+
+  <div id="reader-view" style="display: none;">
+    <button id="close-reader">Close</button>
+    <button id="toc-button">TOC</button>
+    <button id="bookmark-button">Bookmark</button>
+    <div id="toc-overlay" style="display: none;"></div>
+    <div id="viewer"></div>
+  </div>
+
+  <script src="jszip.min.js"></script>
+  <script src="epub.min.js"></script>
+  <script src="ler.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then((reg) => console.log('Service worker registered.', reg))
+        .catch((err) => console.log('Service worker not registered.', err));
+    }
+  </script>
+</body>
+</html>

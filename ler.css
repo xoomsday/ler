@@ -1,0 +1,79 @@
+/* LER stylesheet */
+
+body {
+  font-family: sans-serif;
+  margin: 2em;
+}
+
+h1 {
+  text-align: center;
+}
+
+#book-management {
+  margin: 2em auto;
+  max-width: 600px;
+  border: 1px solid #ccc;
+  padding: 1em;
+}
+
+#book-list ul {
+  list-style: none;
+  padding: 0;
+}
+
+#book-list li {
+  padding: 0.5em;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+#reader-view {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+}
+
+#close-reader {
+  position: absolute;
+  top: 1em;
+  right: 1em;
+  z-index: 2;
+}
+
+#toc-button {
+  position: absolute;
+  top: 1em;
+  left: 1em;
+  z-index: 2;
+}
+
+#bookmark-button {
+  position: absolute;
+  top: 1em;
+  left: 5em;
+  z-index: 2;
+}
+
+#viewer {
+  width: 100%;
+  height: 100%;
+}
+
+
+#toc-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 80%;
+  max-width: 400px;
+  height: 100%;
+  background: #fff;
+  border-right: 1px solid #ccc;
+  overflow-y: auto;
+  z-index: 1;
+  padding: 1em;
+  box-sizing: border-box;
+}
