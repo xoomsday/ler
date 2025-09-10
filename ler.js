@@ -7,6 +7,7 @@ const STORE_NAME = 'epubs';
 let db;
 let currentBook;
 let currentRendition;
+let currentBookId = null;
 let currentBookDirection = 'ltr';
 let currentFontSize = 100;
 let currentLineHeight = 1.5;
@@ -58,6 +59,7 @@ function closeReader() {
   document.getElementById('book-management').style.display = 'block';
   currentRendition = null;
   currentBook = null;
+  currentBookId = null;
   currentBookDirection = 'ltr';
 }
 
@@ -95,20 +97,23 @@ function generateToc() {
 }
 
 function addBookmark() {
-  const cfi = currentRendition.currentLocation().start.cfi;
-  const bookName = currentBook.packaging.metadata.title;
-  let bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
-  if (!bookmarks[bookName]) {
-    bookmarks[bookName] = [];
+  if (!currentBookId) {
+    console.error("Cannot add bookmark, no book is open.");
+    return;
   }
-  bookmarks[bookName].push(cfi);
+  const cfi = currentRendition.currentLocation().start.cfi;
+  let bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
+  if (!bookmarks[currentBookId]) {
+    bookmarks[currentBookId] = [];
+  }
+  bookmarks[currentBookId].push(cfi);
   localStorage.setItem('ler-bookmarks', JSON.stringify(bookmarks));
   alert('Bookmark added!');
 }
 
 function showBookmarks(bookId, bookName) {
   const bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
-  const bookBookmarks = bookmarks[bookName] || [];
+  const bookBookmarks = bookmarks[bookId] || [];
   const tocOverlay = document.getElementById('toc-overlay');
   tocOverlay.innerHTML = '';
   document.getElementById('book-management').style.display = 'none';
@@ -221,7 +226,7 @@ function handleKeyPress(event) {
   }
 }
 
-window.addEventListener('keydown', handleKeyPress, true);
+window.addEventListener('keydown', handleKeyPress);
 
 function handleFileUpload(event) {
   const file = event.target.files[0];
@@ -291,6 +296,7 @@ function displayBooks() {
 }
 
 function openBook(bookId, cfi) {
+  currentBookId = bookId;
   const transaction = db.transaction([STORE_NAME], 'readonly');
   const store = transaction.objectStore(STORE_NAME);
   const request = store.get(bookId);
@@ -311,7 +317,7 @@ function openBook(bookId, cfi) {
       currentRendition.on('rendered', () => {
         const view = currentRendition.manager.views.last();
         if (view && view.iframe) {
-          view.iframe.contentWindow.addEventListener('keydown', handleKeyPress, true);
+          view.iframe.contentWindow.addEventListener('keydown', handleKeyPress);
         }
       });
 
