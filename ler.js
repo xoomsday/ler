@@ -50,7 +50,7 @@ window.addEventListener('load', async () => {
   tocButton.addEventListener('click', toggleToc);
 
   const bookmarkButton = document.getElementById('bookmark-button');
-  bookmarkButton.addEventListener('click', addBookmark);
+  bookmarkButton.addEventListener('click', toggleBookmarksOverlay);
 });
 
 function closeReader() {
@@ -96,50 +96,130 @@ function generateToc() {
   });
 }
 
-function addBookmark() {
-  if (!currentBookId) {
-    console.error("Cannot add bookmark, no book is open.");
-    return;
+function toggleBookmarksOverlay() {
+  const tocOverlay = document.getElementById('toc-overlay');
+  if (tocOverlay.style.display === 'none') {
+    tocOverlay.style.display = 'block';
+    generateBookmarksList();
+  } else {
+    tocOverlay.style.display = 'none';
   }
-  const cfi = currentRendition.currentLocation().start.cfi;
-  let bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
-  if (!bookmarks[currentBookId]) {
-    bookmarks[currentBookId] = [];
-  }
-  bookmarks[currentBookId].push(cfi);
-  localStorage.setItem('ler-bookmarks', JSON.stringify(bookmarks));
-  alert('Bookmark added!');
 }
 
-function showBookmarks(bookId, bookName) {
-  const bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
-  const bookBookmarks = bookmarks[bookId] || [];
+async function generateBookmarksList() {
   const tocOverlay = document.getElementById('toc-overlay');
-  tocOverlay.innerHTML = '';
-  document.getElementById('book-management').style.display = 'none';
-  document.getElementById('reader-view').style.display = 'block';
-  tocOverlay.style.display = 'block';
+  tocOverlay.innerHTML = '<h3>Bookmarks</h3>';
 
+  const addButton = document.createElement('button');
+  addButton.textContent = 'Add bookmark at current location';
+  addButton.addEventListener('click', async () => {
+    await addNewBookmark();
+    await generateBookmarksList(); // Refresh list
+  });
+  tocOverlay.appendChild(addButton);
 
-  if (bookBookmarks.length === 0) {
-    tocOverlay.innerHTML = '<p>No bookmarks for this book.</p>';
-    return;
-  }
+  const bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
+  const bookBookmarks = bookmarks[currentBookId] || [];
 
   const ul = document.createElement('ul');
-  bookBookmarks.forEach((cfi) => {
+  bookBookmarks.sort((a, b) => a.created - b.created).forEach((bookmark) => {
     const li = document.createElement('li');
+
     const a = document.createElement('a');
-    a.textContent = cfi;
     a.href = '#';
+
+    const created = new Date(bookmark.created);
+    const dateString = created.toLocaleString();
+    let text = bookmark.text;
+    if (text === 'Bookmark' || !text) {
+      text = `Bookmark from ${dateString}`;
+    } else {
+      text = `${text}... (${dateString})`;
+    }
+    a.textContent = text;
+
     a.addEventListener('click', (event) => {
       event.preventDefault();
-      openBook(bookId, cfi);
+      // Wait for the content to be rendered before hiding the overlay
+      // to prevent a race condition.
+      currentRendition.once('rendered', () => {
+        toggleBookmarksOverlay();
+      });
+      // Start the navigation.
+      currentRendition.display(bookmark.cfi);
     });
+
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = 'X';
+    deleteButton.className = 'delete-bookmark';
+    deleteButton.addEventListener('click', async () => {
+      await deleteBookmark(bookmark.cfi);
+      await generateBookmarksList(); // Refresh list
+    });
+
     li.appendChild(a);
+    li.appendChild(deleteButton);
     ul.appendChild(li);
   });
   tocOverlay.appendChild(ul);
+
+  if (bookBookmarks.length === 0) {
+    const p = document.createElement('p');
+    p.textContent = 'No bookmarks for this book.';
+    tocOverlay.appendChild(p);
+  }
+}
+
+async function addNewBookmark() {
+  if (!currentBookId || !currentRendition) return;
+
+  const cfi = currentRendition.currentLocation().start.cfi;
+
+  const bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
+  const bookBookmarks = bookmarks[currentBookId] || [];
+  if (bookBookmarks.some(b => b.cfi === cfi)) {
+    alert("Bookmark for this location already exists.");
+    return;
+  }
+
+  let textSnippet = "Bookmark"; // Default text
+  try {
+    const range = await currentBook.getRange(cfi);
+    if (range && range.commonAncestorContainer && range.commonAncestorContainer.textContent) {
+        const content = range.commonAncestorContainer.textContent.trim().replace(/\s+/g, ' ');
+        const startIndex = Math.max(0, range.startOffset - 50);
+        const text = content.substring(startIndex, startIndex + 100);
+        if (text) {
+            textSnippet = text;
+        }
+    }
+  } catch (e) {
+    console.error("Could not generate text snippet for bookmark:", e);
+  }
+
+  const newBookmark = {
+    cfi: cfi,
+    text: textSnippet,
+    created: Date.now()
+  };
+
+  if (!bookmarks[currentBookId]) {
+    bookmarks[currentBookId] = [];
+  }
+  bookmarks[currentBookId].push(newBookmark);
+  localStorage.setItem('ler-bookmarks', JSON.stringify(bookmarks));
+}
+
+async function deleteBookmark(cfi) {
+  if (!currentBookId) return;
+
+  const bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
+  let bookBookmarks = bookmarks[currentBookId] || [];
+
+  bookBookmarks = bookBookmarks.filter(b => b.cfi !== cfi);
+
+  bookmarks[currentBookId] = bookBookmarks;
+  localStorage.setItem('ler-bookmarks', JSON.stringify(bookmarks));
 }
 
 function handleKeyPress(event) {
@@ -280,11 +360,6 @@ function displayBooks() {
       openButton.textContent = 'Read ' + book.name;
       openButton.addEventListener('click', () => openBook(book.id));
       li.appendChild(openButton);
-
-      const bookmarksButton = document.createElement('button');
-      bookmarksButton.textContent = 'Bookmarks';
-      bookmarksButton.addEventListener('click', () => showBookmarks(book.id, book.name));
-      li.appendChild(bookmarksButton);
       ul.appendChild(li);
     });
     bookList.appendChild(ul);
@@ -309,7 +384,8 @@ function openBook(bookId, cfi) {
 
     currentBook = ePub(bookData);
 
-    currentBook.ready.then(() => {
+    currentBook.ready.then(async () => {
+      await currentBook.locations.generate();
       currentBookDirection = currentBook.packaging.metadata.direction || 'ltr';
 
       currentRendition = currentBook.renderTo('viewer', { width: '100%', height: '100%' });

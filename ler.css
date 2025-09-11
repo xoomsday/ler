@@ -62,7 +62,6 @@ h1 {
   height: 100%;
 }
 
-
 #toc-overlay {
   position: absolute;
   top: 0;
@@ -76,4 +75,25 @@ h1 {
   z-index: 1;
   padding: 1em;
   box-sizing: border-box;
+}
+
+#toc-overlay ul {
+  list-style: none;
+  padding: 0;
+}
+
+#toc-overlay li {
+  padding: 0.5em 0;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.delete-bookmark {
+  background: #ffdddd;
+  border: 1px solid #ffaaaa;
+  color: #990000;
+  cursor: pointer;
+  margin-left: 1em;
 }
