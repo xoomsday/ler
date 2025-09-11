@@ -63,19 +63,32 @@ function closeReader() {
   currentBookDirection = 'ltr';
 }
 
-function toggleToc() {
+function toggleOverlay(type) {
   const tocOverlay = document.getElementById('toc-overlay');
-  if (tocOverlay.style.display === 'none') {
-    tocOverlay.style.display = 'block';
-    generateToc();
-  } else {
+  const currentContent = tocOverlay.dataset.content;
+  const isVisible = tocOverlay.style.display !== 'none';
+
+  if (isVisible && currentContent === type) {
     tocOverlay.style.display = 'none';
+    tocOverlay.dataset.content = '';
+  } else {
+    tocOverlay.style.display = 'block';
+    tocOverlay.dataset.content = type;
+    if (type === 'toc') {
+      generateToc();
+    } else if (type === 'bookmarks') {
+      generateBookmarksList();
+    }
   }
+}
+
+function toggleToc() {
+  toggleOverlay('toc');
 }
 
 function generateToc() {
   const tocOverlay = document.getElementById('toc-overlay');
-  tocOverlay.innerHTML = '';
+  tocOverlay.innerHTML = '<h3>Table of Contents</h3>';
 
   currentBook.loaded.navigation.then((toc) => {
     const tocList = document.createElement('ul');
@@ -87,7 +100,7 @@ function generateToc() {
       a.addEventListener('click', (event) => {
         event.preventDefault();
         currentRendition.display(item.href);
-        toggleToc();
+        toggleOverlay('toc'); // Close after selection
       });
       li.appendChild(a);
       tocList.appendChild(li);
@@ -97,13 +110,7 @@ function generateToc() {
 }
 
 function toggleBookmarksOverlay() {
-  const tocOverlay = document.getElementById('toc-overlay');
-  if (tocOverlay.style.display === 'none') {
-    tocOverlay.style.display = 'block';
-    generateBookmarksList();
-  } else {
-    tocOverlay.style.display = 'none';
-  }
+  toggleOverlay('bookmarks');
 }
 
 async function generateBookmarksList() {
@@ -144,7 +151,7 @@ async function generateBookmarksList() {
       // navigation is complete. We wait for it, and then hide the overlay.
       try {
         await gotoCFI(bookmark.cfi);
-        toggleBookmarksOverlay();
+        toggleOverlay('bookmarks');
       } catch (e) {
         console.error("Error navigating to CFI:", e);
         // On error, we leave the overlay open as a visual indicator.
