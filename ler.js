@@ -138,15 +138,17 @@ async function generateBookmarksList() {
     }
     a.textContent = text;
 
-    a.addEventListener('click', (event) => {
+    a.addEventListener('click', async (event) => {
       event.preventDefault();
-      // Wait for the content to be rendered before hiding the overlay
-      // to prevent a race condition.
-      currentRendition.once('rendered', () => {
+      // The gotoCFI function now returns a promise that resolves when
+      // navigation is complete. We wait for it, and then hide the overlay.
+      try {
+        await gotoCFI(bookmark.cfi);
         toggleBookmarksOverlay();
-      });
-      // Start the navigation.
-      currentRendition.display(bookmark.cfi);
+      } catch (e) {
+        console.error("Error navigating to CFI:", e);
+        // On error, we leave the overlay open as a visual indicator.
+      }
     });
 
     const deleteButton = document.createElement('button');
@@ -168,6 +170,30 @@ async function generateBookmarksList() {
     p.textContent = 'No bookmarks for this book.';
     tocOverlay.appendChild(p);
   }
+}
+
+async function gotoCFI(cfi) {
+  if (!currentRendition) return;
+
+  // First, display the section. This may not be the exact page.
+  await currentRendition.display(cfi);
+
+  // Now, loop until we are at the correct page or slightly past it.
+  // A safety break is included to prevent infinite loops.
+  for (let i = 0; i < 50; i++) {
+    const currentLocation = currentRendition.currentLocation().start.cfi;
+    const comparison = currentRendition.epubcfi.compare(cfi, currentLocation);
+
+    if (comparison > 0) {
+      // The target CFI is still ahead of us. Go to the next page and wait.
+      await nextPage();
+    } else {
+      // We have arrived at or moved just past the target CFI. Stop.
+      return;
+    }
+  }
+
+  console.warn('gotoCFI exited due to safety break.');
 }
 
 async function addNewBookmark() {
@@ -222,64 +248,64 @@ async function deleteBookmark(cfi) {
   localStorage.setItem('ler-bookmarks', JSON.stringify(bookmarks));
 }
 
+async function nextPage() {
+  if (!currentRendition) return;
+
+  let atSectionEnd = false;
+  if (currentRendition.location) {
+    const { end } = currentRendition.location;
+    atSectionEnd = (end.displayed.page >= end.displayed.total);
+  }
+
+  if (atSectionEnd) {
+    const currentSection = currentRendition.manager.views.last().section;
+    const nextSection = currentSection.next();
+    if (nextSection) {
+      return currentRendition.display(nextSection.href);
+    }
+  } else {
+    return currentRendition.next();
+  }
+}
+
+async function prevPage() {
+  if (!currentRendition) return;
+
+  let atSectionStart = false;
+  if (currentRendition.location) {
+    const { start } = currentRendition.location;
+    atSectionStart = (start.displayed.page === 1);
+  }
+
+  if (atSectionStart) {
+    const currentSection = currentRendition.manager.views.first().section;
+    const prevSection = currentSection.prev();
+    if (prevSection) {
+      return currentRendition.display(prevSection.href);
+    }
+  } else {
+    return currentRendition.prev();
+  }
+}
+
 function handleKeyPress(event) {
   if (document.getElementById('reader-view').style.display !== 'block' || !currentRendition) {
     return;
   }
 
-  let atSectionStart = false;
-  let atSectionEnd = false;
-  if (currentRendition.location) {
-    const { start, end } = currentRendition.location;
-    atSectionStart = (start.displayed.page === 1);
-    atSectionEnd = (end.displayed.page >= end.displayed.total);
-  }
-
   switch (event.key) {
     case 'ArrowLeft':
       if (currentBookDirection === 'rtl') {
-        if (atSectionEnd) {
-          const currentSection = currentRendition.manager.views.last().section;
-          const nextSection = currentSection.next();
-          if (nextSection) {
-            currentRendition.display(nextSection.href);
-          }
-        } else {
-          currentRendition.next();
-        }
+        nextPage();
       } else {
-        if (atSectionStart) {
-          const currentSection = currentRendition.manager.views.first().section;
-          const prevSection = currentSection.prev();
-          if (prevSection) {
-            currentRendition.display(prevSection.href);
-          }
-        } else {
-          currentRendition.prev();
-        }
+        prevPage();
       }
       break;
     case 'ArrowRight':
       if (currentBookDirection === 'rtl') {
-        if (atSectionStart) {
-          const currentSection = currentRendition.manager.views.first().section;
-          const prevSection = currentSection.prev();
-          if (prevSection) {
-            currentRendition.display(prevSection.href);
-          }
-        } else {
-          currentRendition.prev();
-        }
+        prevPage();
       } else {
-        if (atSectionEnd) {
-          const currentSection = currentRendition.manager.views.last().section;
-          const nextSection = currentSection.next();
-          if (nextSection) {
-            currentRendition.display(nextSection.href);
-          }
-        } else {
-          currentRendition.next();
-        }
+        nextPage();
       }
       break;
     case '+':
@@ -385,7 +411,6 @@ function openBook(bookId, cfi) {
     currentBook = ePub(bookData);
 
     currentBook.ready.then(async () => {
-      await currentBook.locations.generate();
       currentBookDirection = currentBook.packaging.metadata.direction || 'ltr';
 
       currentRendition = currentBook.renderTo('viewer', { width: '100%', height: '100%' });
