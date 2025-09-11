@@ -32,7 +32,7 @@ h1 {
   top: 1em;
   left: 1em;
   right: 1em;
-  z-index: 2;
+  z-index: 4;
   transition: opacity 0.5s ease-in-out;
 }
 
@@ -74,7 +74,7 @@ h1 {
   background: #fff;
   border-right: 1px solid #ccc;
   overflow-y: auto;
-  z-index: 1;
+  z-index: 5;
   padding: 1em;
   box-sizing: border-box;
 }
@@ -98,4 +98,26 @@ h1 {
   color: #990000;
   cursor: pointer;
   margin-left: 1em;
+}
+
+#prev-page-area, #center-page-area, #next-page-area {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  z-index: 3; /* Above the viewer but below controls */
+}
+
+#prev-page-area {
+  left: 0;
+  width: 25%;
+}
+
+#center-page-area {
+  left: 25%;
+  width: 50%;
+}
+
+#next-page-area {
+  right: 0;
+  width: 25%;
 }

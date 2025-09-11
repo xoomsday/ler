@@ -76,6 +76,27 @@ window.addEventListener('load', async () => {
 
   const bookmarkButton = document.getElementById('bookmark-button');
   bookmarkButton.addEventListener('click', toggleBookmarksOverlay);
+
+  const prevPageArea = document.getElementById('prev-page-area');
+  prevPageArea.addEventListener('click', () => {
+    if (currentBookDirection === 'rtl') {
+      nextPage();
+    } else {
+      prevPage();
+    }
+  });
+
+  const nextPageArea = document.getElementById('next-page-area');
+  nextPageArea.addEventListener('click', () => {
+    if (currentBookDirection === 'rtl') {
+      prevPage();
+    } else {
+      nextPage();
+    }
+  });
+
+  const centerPageArea = document.getElementById('center-page-area');
+  centerPageArea.addEventListener('click', showControls);
 });
 
 function closeReader() {
