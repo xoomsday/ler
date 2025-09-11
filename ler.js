@@ -1,8 +1,7 @@
-// LER javascript
-
 const DB_NAME = 'ler-books';
 const DB_VERSION = 1;
-const STORE_NAME = 'epubs';
+const STORE_BOOKS_NAME = 'epubs';
+const STORE_METADATA_NAME = 'metadata';
 
 let db;
 let currentBook;
@@ -44,8 +43,11 @@ function initDB() {
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+      if (!db.objectStoreNames.contains(STORE_BOOKS_NAME)) {
+        db.createObjectStore(STORE_BOOKS_NAME, { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains(STORE_METADATA_NAME)) {
+        db.createObjectStore(STORE_METADATA_NAME, { keyPath: 'bookId' });
       }
     };
 
@@ -99,7 +101,9 @@ window.addEventListener('load', async () => {
   centerPageArea.addEventListener('click', showControls);
 });
 
-function closeReader() {
+async function closeReader() {
+  await saveLastLocation();
+
   const readerView = document.getElementById('reader-view');
   removeInputHandlers(readerView);
   clearTimeout(controlsTimer);
@@ -111,6 +115,39 @@ function closeReader() {
   currentBook = null;
   currentBookId = null;
   currentBookDirection = 'ltr';
+}
+
+function saveLastLocation() {
+  return new Promise((resolve, reject) => {
+    if (!currentRendition || !currentBookId) {
+      return resolve(); // Nothing to save
+    }
+
+    try {
+      const cfi = currentRendition.currentLocation().start.cfi;
+      const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_METADATA_NAME);
+
+      transaction.oncomplete = () => {
+        resolve();
+      };
+      transaction.onerror = (event) => {
+        console.error("Transaction error on saveLastLocation:", event.target.error);
+        reject(event.target.error);
+      };
+
+      const request = store.get(currentBookId);
+      request.onsuccess = () => {
+        const data = request.result || { bookId: currentBookId };
+        data.lastLocation = cfi;
+        store.put(data);
+      };
+    } catch (e) {
+      // This can happen if the rendition is not ready yet
+      console.warn("Could not save last location:", e);
+      resolve(); // Resolve anyway so we don't block closing
+    }
+  });
 }
 
 function toggleOverlay(type) {
@@ -314,20 +351,27 @@ async function nextPage() {
     atSectionEnd = (end.displayed.page >= end.displayed.total);
   }
 
+  let promise;
   if (atSectionEnd) {
     const currentSection = currentRendition.manager.views.last().section;
     const nextSection = currentSection.next();
     if (nextSection) {
-      return currentRendition.display(nextSection.href);
+      promise = currentRendition.display(nextSection.href);
     }
   } else {
-    return currentRendition.next();
+    promise = currentRendition.next();
+  }
+
+  if (promise) {
+    await promise;
+    await saveLastLocation();
   }
 }
 
 async function prevPage() {
   if (!currentRendition) return;
-  return currentRendition.prev();
+  await currentRendition.prev();
+  await saveLastLocation();
 }
 
 function handleKeyPress(event) {
@@ -389,8 +433,8 @@ function handleFileUpload(event) {
 }
 
 function storeBook(name, data) {
-  const transaction = db.transaction([STORE_NAME], 'readwrite');
-  const store = transaction.objectStore(STORE_NAME);
+  const transaction = db.transaction([STORE_BOOKS_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_BOOKS_NAME);
   const book = { name, data };
   const request = store.add(book);
 
@@ -408,8 +452,8 @@ function displayBooks() {
   const bookList = document.getElementById('book-list');
   bookList.innerHTML = '';
 
-  const transaction = db.transaction([STORE_NAME], 'readonly');
-  const store = transaction.objectStore(STORE_NAME);
+  const transaction = db.transaction([STORE_BOOKS_NAME], 'readonly');
+  const store = transaction.objectStore(STORE_BOOKS_NAME);
   const request = store.getAll();
 
   request.onsuccess = () => {
@@ -436,45 +480,68 @@ function displayBooks() {
   };
 }
 
-function openBook(bookId, cfi) {
+function openBook(bookId) {
   currentBookId = bookId;
-  const transaction = db.transaction([STORE_NAME], 'readonly');
-  const store = transaction.objectStore(STORE_NAME);
-  const request = store.get(bookId);
 
-  request.onsuccess = () => {
-    const bookData = request.result.data;
-    document.getElementById('book-management').style.display = 'none';
-    const readerView = document.getElementById('reader-view');
-    readerView.style.display = 'block';
+  Promise.all([
+    getFromDB(STORE_BOOKS_NAME, bookId),
+    getFromDB(STORE_METADATA_NAME, bookId)
+  ]).then(([bookRecord, metadataRecord]) => {
+    const bookData = bookRecord.data;
+    const cfi = metadataRecord ? metadataRecord.lastLocation : null;
+    openRendition(bookData, cfi);
+  }).catch(error => {
+    console.error("Error opening book:", error);
+    // Optionally, show an error to the user
+  });
+}
 
-    addInputHandlers(readerView);
-    showControls(); // Show controls when book is opened
+function getFromDB(storeName, key) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([storeName], 'readonly');
+    const store = transaction.objectStore(storeName);
+    const request = store.get(key);
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+    request.onerror = (event) => {
+      reject(event.target.error);
+    };
+  });
+}
 
-    currentBook = ePub(bookData);
+function openRendition(bookData, cfi) {
+  document.getElementById('book-management').style.display = 'none';
+  const readerView = document.getElementById('reader-view');
+  readerView.style.display = 'block';
 
-    currentBook.ready.then(async () => {
-      currentBookDirection = currentBook.packaging.metadata.direction || 'ltr';
+  addInputHandlers(readerView);
+  showControls(); // Show controls when book is opened
 
-      currentRendition = currentBook.renderTo('viewer', { width: '100%', height: '100%' });
+  currentBook = ePub(bookData);
 
-      currentRendition.on('rendered', () => {
-        const view = currentRendition.manager.views.last();
-        if (view && view.iframe) {
-          addInputHandlers(view.iframe.contentWindow);
-          view.iframe.contentWindow.focus();
-        }
-      });
+  currentBook.ready.then(async () => {
+    currentBookDirection = currentBook.packaging.metadata.direction || 'ltr';
 
-      // Apply themes that might have been set before rendition was ready
-      currentRendition.themes.fontSize(currentFontSize + '%');
-      currentRendition.themes.override('line-height', currentLineHeight);
+    currentRendition = currentBook.renderTo('viewer', { width: '100%', height: '100%' });
 
-      return currentRendition.display(cfi);
+    currentRendition.on('rendered', () => {
+      const view = currentRendition.manager.views.last();
+      if (view && view.iframe) {
+        addInputHandlers(view.iframe.contentWindow);
+        view.iframe.contentWindow.focus();
+      }
     });
-  };
 
-  request.onerror = (event) => {
-    console.error('Error fetching book:', event.target.errorCode);
-  };
+    // Apply themes that might have been set before rendition was ready
+    currentRendition.themes.fontSize(currentFontSize + '%');
+    currentRendition.themes.override('line-height', currentLineHeight);
+
+    if (cfi) {
+      await gotoCFI(cfi);
+    } else {
+      await currentRendition.display();
+    }
+    await saveLastLocation();
+  });
 }
