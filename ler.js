@@ -152,13 +152,20 @@ function saveLastLocation() {
 
 function toggleOverlay(type) {
   const tocOverlay = document.getElementById('toc-overlay');
+  const controls = document.getElementById('reader-controls');
   const currentContent = tocOverlay.dataset.content;
   const isVisible = tocOverlay.style.display !== 'none';
 
   if (isVisible && currentContent === type) {
+    // Hide the overlay and restart the auto-hide timer
     tocOverlay.style.display = 'none';
     tocOverlay.dataset.content = '';
+    showControls();
   } else {
+    // Show the overlay, and cancel any pending auto-hide
+    clearTimeout(controlsTimer);
+    controls.classList.remove('controls-hidden');
+
     tocOverlay.style.display = 'block';
     tocOverlay.dataset.content = type;
     if (type === 'toc') {
