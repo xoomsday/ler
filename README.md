@@ -18,34 +18,41 @@ the browser's IndexedDB.
 *   **Offline-First PWA**: Can be installed to the home screen and used
     entirely without a network connection after the initial visit.
 *   **Book Management**:
-    *   **Upload Books**: Add EPUB files from your local device using
-      the file picker.
-    *   **Local Storage**: EPUB files are stored persistently in the
-      browser's IndexedDB.
+    *   **Upload Books**: Add EPUB files from your local device with a
+      clean, simple button.
+    *   **Local Storage**: EPUB files and user metadata are stored
+      persistently in the browser's IndexedDB.
     *   **Book Listing**: View a list of all uploaded books on the main
       management screen.
 *   **Reader View**:
+    *   **Remembers Your Place**: The application automatically saves
+      your last reading position on every page turn and returns you to
+      it when you reopen a book.
+    *   **Per-Book Display Settings**: Font size and line height are
+      saved for each book individually and restored when the book is
+      reopened.
     *   **EPUB Rendering**: Opens and displays EPUB files using the
       `epub.js` library.
     *   **Table of Contents (TOC) & Bookmarking**: A unified overlay
       allows for easy navigation. Users can jump to chapters via the
       TOC or create/delete/navigate to bookmarks. The view can be
       switched between TOC and Bookmarks without closing the overlay.
-    *   **Auto-Hiding Controls**: The main navigation buttons (TOC,
-      Bookmark, Close) automatically fade out during reading to provide
-      an unobstructed view. They reappear on mouse movement or a tap in
-      the center of the screen.
+    *   **Auto-Hiding Controls**: The main navigation buttons automatically
+      fade out during reading. They reappear on mouse movement or a tap
+      in the center of the screen.
     *   **Keyboard Navigation**:
-        *   `ArrowLeft` / `ArrowRight`: Navigate between pages, with
-          support for right-to-left (RTL) page progression.
+        *   `ArrowLeft` / `ArrowRight`: Navigate between pages.
         *   `+` / `-`: Increase or decrease the font size.
         *   `[` / `]`: Increase or decrease the line spacing.
-    *   **Touch Navigation**:
-        *   Tap on the left or right 25% of the screen to turn pages.
-        *   Tap on the center 50% of the screen to show the navigation
-          controls.
-    *   **Close Reader**: Return to the book management view from the
-      reader.
+        *   `0`: Reset font size and line height to default.
+    *   **Touch & Mouse Navigation**:
+        *   Tap/click on the left or right 25% of the screen to turn
+          pages.
+        *   Tap/click on the center 50% of the screen to show the
+          navigation controls.
+    *   **On-Screen Display Controls**: Buttons are available to
+      increase/decrease font size and line height.
+    *   **Close Reader**: Return to the book management view.
 
 ## How to Use
 
@@ -55,46 +62,41 @@ the browser's IndexedDB.
     http.server` or a similar tool.
 2.  **Open the Application**: Navigate to `LocalEpubReader.html` in your
     browser.
-3.  **Upload a Book**: Click the "Add a new book" input field and
-    select an `.epub` file from your device. It will appear in the book
-    list.
-4.  **Read a Book**: Click the "Read" button next to a book's name to
-    open the reader view.
+3.  **Upload a Book**: Click the "Add a new book" button and select an
+    `.epub` file. It will appear in the book list.
+4.  **Read a Book**: Click the "Read" button next to a book's name. It
+    will open to your last read position.
 5.  **Navigate**:
     *   **Keyboard**: Use the `ArrowLeft` and `ArrowRight` keys.
     *   **Touch/Mouse**: Tap or click on the left/right edges of the
       screen.
 6.  **Show Controls**: Move your mouse, or tap/click the center of the
     screen.
-7.  **Adjust Display**: Use `+`, `-`, `[`, and `]` to change font size
-    and line height.
+7.  **Adjust Display**: Use the on-screen `A+`/`A-` buttons for font
+    size, `+`/`-` buttons for line height, or the corresponding
+    keyboard shortcuts (`+`/`-`/`[`/`]`). Press `0` to reset.
 8.  **Use TOC/Bookmarks**: Click the "TOC" or "Bookmark" buttons to
     access those features.
 9.  **Close the Book**: Click the "Close" button to return to the book
-    list.
+    list. Your position will be saved.
 
 ## Planned and Missing Features
 
 This section details features that are part of the project's vision but
 are not yet implemented.
 
-### Planned but Missing
-
-These features are planned but have not been implemented at all:
-
 *   **Delete Books**: There is currently no way to remove a book from
     the library once it has been uploaded.
-*   **Save Last Reading Position**: The application does not remember
-    where you left off in a book. When you reopen a book, it starts
-    from the beginning.
 *   **Advanced Book Management**: The library view is a simple list.
     Features like sorting (by author, title, last read) or grouping are
     not available.
+*   **Bookmark Migration**: The bookmark data is still stored in
+    `localStorage` and should be migrated to `IndexedDB` for better
+    performance and consistency.
 *   **Full Page Progression and Writing Mode Support**: While basic RTL
-    support is present for keyboard and touch navigation, comprehensive
-    testing and support for all `page-progression-direction` and
-    `writing-mode` (e.g., vertical-rl) CSS attributes are not yet
-    implemented.
+    support is present, comprehensive testing and support for all
+    `page-progression-direction` and `writing-mode` (e.g.,
+    vertical-rl) CSS attributes are not yet implemented.
 *   **Tracking Reading Time**: The application does not yet track when a
     book was last opened or read.
 
