@@ -270,22 +270,7 @@ async function nextPage() {
 
 async function prevPage() {
   if (!currentRendition) return;
-
-  let atSectionStart = false;
-  if (currentRendition.location) {
-    const { start } = currentRendition.location;
-    atSectionStart = (start.displayed.page === 1);
-  }
-
-  if (atSectionStart) {
-    const currentSection = currentRendition.manager.views.first().section;
-    const prevSection = currentSection.prev();
-    if (prevSection) {
-      return currentRendition.display(prevSection.href);
-    }
-  } else {
-    return currentRendition.prev();
-  }
+  return currentRendition.prev();
 }
 
 function handleKeyPress(event) {
