@@ -27,6 +27,29 @@ h1 {
   cursor: pointer;
 }
 
+#reader-controls {
+  position: absolute;
+  top: 1em;
+  left: 1em;
+  right: 1em;
+  z-index: 2;
+  transition: opacity 0.5s ease-in-out;
+}
+
+#reader-controls.controls-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#reader-controls button {
+  margin-right: 1em;
+}
+
+#reader-controls #close-reader {
+  float: right;
+  margin-right: 0;
+}
+
 #reader-view {
   position: fixed;
   top: 0;
@@ -34,27 +57,6 @@ h1 {
   width: 100%;
   height: 100%;
   background: #fff;
-}
-
-#close-reader {
-  position: absolute;
-  top: 1em;
-  right: 1em;
-  z-index: 2;
-}
-
-#toc-button {
-  position: absolute;
-  top: 1em;
-  left: 1em;
-  z-index: 2;
-}
-
-#bookmark-button {
-  position: absolute;
-  top: 1em;
-  left: 5em;
-  z-index: 2;
 }
 
 #viewer {

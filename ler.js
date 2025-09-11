@@ -11,11 +11,36 @@ let currentBookId = null;
 let currentBookDirection = 'ltr';
 let currentFontSize = 100;
 let currentLineHeight = 1.5;
+let controlsTimer = null;
+
+function showControls() {
+  const controls = document.getElementById('reader-controls');
+  controls.classList.remove('controls-hidden');
+
+  clearTimeout(controlsTimer);
+  controlsTimer = setTimeout(hideControls, 3000);
+}
+
+function hideControls() {
+  const controls = document.getElementById('reader-controls');
+  controls.classList.add('controls-hidden');
+}
+
+function addInputHandlers(element) {
+  element.addEventListener('keydown', handleKeyPress);
+  element.addEventListener('mousemove', showControls);
+  element.addEventListener('click', showControls);
+}
+
+function removeInputHandlers(element) {
+  element.removeEventListener('keydown', handleKeyPress);
+  element.removeEventListener('mousemove', showControls);
+  element.removeEventListener('click', showControls);
+}
 
 function initDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
@@ -54,6 +79,10 @@ window.addEventListener('load', async () => {
 });
 
 function closeReader() {
+  const readerView = document.getElementById('reader-view');
+  removeInputHandlers(readerView);
+  clearTimeout(controlsTimer);
+
   document.getElementById('reader-view').style.display = 'none';
   document.getElementById('viewer').innerHTML = '';
   document.getElementById('book-management').style.display = 'block';
@@ -324,8 +353,6 @@ function handleKeyPress(event) {
   }
 }
 
-window.addEventListener('keydown', handleKeyPress);
-
 function handleFileUpload(event) {
   const file = event.target.files[0];
   if (!file) {
@@ -400,6 +427,9 @@ function openBook(bookId, cfi) {
     const readerView = document.getElementById('reader-view');
     readerView.style.display = 'block';
 
+    addInputHandlers(readerView);
+    showControls(); // Show controls when book is opened
+
     currentBook = ePub(bookData);
 
     currentBook.ready.then(async () => {
@@ -410,7 +440,8 @@ function openBook(bookId, cfi) {
       currentRendition.on('rendered', () => {
         const view = currentRendition.manager.views.last();
         if (view && view.iframe) {
-          view.iframe.contentWindow.addEventListener('keydown', handleKeyPress);
+          addInputHandlers(view.iframe.contentWindow);
+          view.iframe.contentWindow.focus();
         }
       });
 
