@@ -27,14 +27,12 @@ function hideControls() {
   controls.classList.add('controls-hidden');
 }
 
-function addInputHandlers(element) {
-  element.addEventListener('keydown', handleKeyPress);
+function addMouseHandlers(element) {
   element.addEventListener('mousemove', showControls);
   element.addEventListener('click', showControls);
 }
 
-function removeInputHandlers(element) {
-  element.removeEventListener('keydown', handleKeyPress);
+function removeMouseHandlers(element) {
   element.removeEventListener('mousemove', showControls);
   element.removeEventListener('click', showControls);
 }
@@ -113,7 +111,8 @@ async function closeReader() {
   await saveLastLocation();
 
   const readerView = document.getElementById('reader-view');
-  removeInputHandlers(readerView);
+  window.removeEventListener('keydown', handleKeyPress);
+  removeMouseHandlers(readerView);
   clearTimeout(controlsTimer);
 
   document.getElementById('reader-view').style.display = 'none';
@@ -461,6 +460,7 @@ async function handleKeyPress(event) {
   if (document.getElementById('reader-view').style.display !== 'block' || !currentRendition) {
     return;
   }
+  event.stopPropagation();
 
   switch (event.key) {
     case 'ArrowLeft':
@@ -607,7 +607,8 @@ function openRendition(bookData, metadata) {
   const readerView = document.getElementById('reader-view');
   readerView.style.display = 'block';
 
-  addInputHandlers(readerView);
+  window.addEventListener('keydown', handleKeyPress);
+  addMouseHandlers(readerView);
   showControls(); // Show controls when book is opened
 
   currentBook = ePub(bookData);
@@ -620,7 +621,8 @@ function openRendition(bookData, metadata) {
     currentRendition.on('rendered', () => {
       const view = currentRendition.manager.views.last();
       if (view && view.iframe) {
-        addInputHandlers(view.iframe.contentWindow);
+        view.iframe.contentWindow.addEventListener('keydown', handleKeyPress);
+        addMouseHandlers(view.iframe.contentWindow);
         view.iframe.contentWindow.focus();
       }
     });
