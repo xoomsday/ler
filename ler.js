@@ -1,3 +1,5 @@
+// LER javascript
+
 const DB_NAME = 'ler-books';
 const DB_VERSION = 1;
 const STORE_BOOKS_NAME = 'epubs';
@@ -79,6 +81,12 @@ window.addEventListener('load', async () => {
   const bookmarkButton = document.getElementById('bookmark-button');
   bookmarkButton.addEventListener('click', toggleBookmarksOverlay);
 
+  document.getElementById('font-size-dec').addEventListener('click', decreaseFontSize);
+  document.getElementById('font-size-inc').addEventListener('click', increaseFontSize);
+  document.getElementById('line-height-dec').addEventListener('click', decreaseLineHeight);
+  document.getElementById('line-height-inc').addEventListener('click', increaseLineHeight);
+
+
   const prevPageArea = document.getElementById('prev-page-area');
   prevPageArea.addEventListener('click', () => {
     if (currentBookDirection === 'rtl') {
@@ -148,6 +156,74 @@ function saveLastLocation() {
       resolve(); // Resolve anyway so we don't block closing
     }
   });
+}
+
+function saveBookSettings() {
+  return new Promise((resolve, reject) => {
+    if (!currentBookId) {
+      return resolve(); // Nothing to save for
+    }
+
+    const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_METADATA_NAME);
+
+    transaction.oncomplete = () => {
+      resolve();
+    };
+    transaction.onerror = (event) => {
+      console.error("Transaction error on saveBookSettings:", event.target.error);
+      reject(event.target.error);
+    };
+
+    const request = store.get(currentBookId);
+    request.onsuccess = () => {
+      const data = request.result || { bookId: currentBookId };
+      data.fontSize = currentFontSize;
+      data.lineHeight = currentLineHeight;
+      store.put(data);
+    };
+  });
+}
+
+async function increaseFontSize() {
+  if (!currentRendition) return;
+  currentFontSize += 10;
+  currentRendition.themes.fontSize(currentFontSize + '%');
+  await saveBookSettings();
+}
+
+async function decreaseFontSize() {
+  if (!currentRendition) return;
+  if (currentFontSize > 10) {
+    currentFontSize -= 10;
+    currentRendition.themes.fontSize(currentFontSize + '%');
+    await saveBookSettings();
+  }
+}
+
+async function increaseLineHeight() {
+  if (!currentRendition) return;
+  currentLineHeight += 0.1;
+  currentRendition.themes.override('line-height', currentLineHeight);
+  await saveBookSettings();
+}
+
+async function decreaseLineHeight() {
+  if (!currentRendition) return;
+  if (currentLineHeight > 1) {
+    currentLineHeight -= 0.1;
+    currentRendition.themes.override('line-height', currentLineHeight);
+    await saveBookSettings();
+  }
+}
+
+async function resetFontSettings() {
+  if (!currentRendition) return;
+  currentFontSize = 100;
+  currentLineHeight = 1.5;
+  currentRendition.themes.fontSize(currentFontSize + '%');
+  currentRendition.themes.override('line-height', currentLineHeight);
+  await saveBookSettings();
 }
 
 function toggleOverlay(type) {
@@ -381,7 +457,7 @@ async function prevPage() {
   await saveLastLocation();
 }
 
-function handleKeyPress(event) {
+async function handleKeyPress(event) {
   if (document.getElementById('reader-view').style.display !== 'block' || !currentRendition) {
     return;
   }
@@ -403,24 +479,19 @@ function handleKeyPress(event) {
       break;
     case '+':
     case '=': // Also handle '=' for keyboards where + is a shift key
-      currentFontSize += 10;
-      currentRendition.themes.fontSize(currentFontSize + '%');
+      increaseFontSize();
       break;
     case '-':
-      if (currentFontSize > 10) {
-        currentFontSize -= 10;
-        currentRendition.themes.fontSize(currentFontSize + '%');
-      }
+      decreaseFontSize();
       break;
     case '[':
-      if (currentLineHeight > 1) {
-        currentLineHeight -= 0.1;
-        currentRendition.themes.override('line-height', currentLineHeight);
-      }
+      decreaseLineHeight();
       break;
     case ']':
-      currentLineHeight += 0.1;
-      currentRendition.themes.override('line-height', currentLineHeight);
+      increaseLineHeight();
+      break;
+    case '0':
+      resetFontSettings();
       break;
   }
 }
@@ -495,8 +566,7 @@ function openBook(bookId) {
     getFromDB(STORE_METADATA_NAME, bookId)
   ]).then(([bookRecord, metadataRecord]) => {
     const bookData = bookRecord.data;
-    const cfi = metadataRecord ? metadataRecord.lastLocation : null;
-    openRendition(bookData, cfi);
+    openRendition(bookData, metadataRecord);
   }).catch(error => {
     console.error("Error opening book:", error);
     // Optionally, show an error to the user
@@ -517,7 +587,22 @@ function getFromDB(storeName, key) {
   });
 }
 
-function openRendition(bookData, cfi) {
+function openRendition(bookData, metadata) {
+  // Reset settings to default before applying book-specific ones
+  currentFontSize = 100;
+  currentLineHeight = 1.5;
+
+  if (metadata) {
+    if (metadata.fontSize) {
+      currentFontSize = metadata.fontSize;
+    }
+    if (metadata.lineHeight) {
+      currentLineHeight = metadata.lineHeight;
+    }
+  }
+
+  const cfi = metadata ? metadata.lastLocation : null;
+
   document.getElementById('book-management').style.display = 'none';
   const readerView = document.getElementById('reader-view');
   readerView.style.display = 'block';
