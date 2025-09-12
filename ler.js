@@ -1,9 +1,10 @@
 // LER javascript
 
 const DB_NAME = 'ler-books';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_BOOKS_NAME = 'epubs';
 const STORE_METADATA_NAME = 'metadata';
+const STORE_BOOKMARKS_NAME = 'bookmarks';
 
 let db;
 let currentBook;
@@ -49,6 +50,10 @@ function initDB() {
       if (!db.objectStoreNames.contains(STORE_METADATA_NAME)) {
         db.createObjectStore(STORE_METADATA_NAME, { keyPath: 'bookId' });
       }
+      if (!db.objectStoreNames.contains(STORE_BOOKMARKS_NAME)) {
+        const bookmarksStore = db.createObjectStore(STORE_BOOKMARKS_NAME, { keyPath: 'id', autoIncrement: true });
+        bookmarksStore.createIndex('by_bookId', 'bookId', { unique: false });
+      }
     };
 
     request.onsuccess = (event) => {
@@ -63,8 +68,54 @@ function initDB() {
   });
 }
 
+async function migrateBookmarksFromLocalStorage() {
+    const bookmarksJSON = localStorage.getItem('ler-bookmarks');
+    if (!bookmarksJSON) {
+        return; // Nothing to migrate
+    }
+
+    const bookmarks = JSON.parse(bookmarksJSON);
+    const bookIds = Object.keys(bookmarks);
+
+    if (bookIds.length === 0) {
+        localStorage.removeItem('ler-bookmarks');
+        return;
+    }
+
+    const transaction = db.transaction([STORE_BOOKMARKS_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_BOOKMARKS_NAME);
+
+    bookIds.forEach(bookId => {
+        const bookBookmarks = bookmarks[bookId];
+        bookBookmarks.forEach(bookmark => {
+            const numericBookId = parseInt(bookId, 10);
+            if (!isNaN(numericBookId)) {
+                store.add({
+                    bookId: numericBookId,
+                    cfi: bookmark.cfi,
+                    text: bookmark.text,
+                    created: bookmark.created
+                });
+            }
+        });
+    });
+
+    return new Promise((resolve, reject) => {
+        transaction.oncomplete = () => {
+            console.log('Bookmarks migrated successfully.');
+            localStorage.removeItem('ler-bookmarks');
+            resolve();
+        };
+        transaction.onerror = (event) => {
+            console.error('Error migrating bookmarks:', event.target.error);
+            reject(event.target.error);
+        };
+    });
+}
+
 window.addEventListener('load', async () => {
   await initDB();
+  await migrateBookmarksFromLocalStorage();
   displayBooks();
 
   const uploadInput = document.getElementById('epub-upload');
@@ -294,58 +345,68 @@ async function generateBookmarksList() {
   });
   tocOverlay.appendChild(addButton);
 
-  const bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
-  const bookBookmarks = bookmarks[currentBookId] || [];
+  const transaction = db.transaction([STORE_BOOKMARKS_NAME], 'readonly');
+  const store = transaction.objectStore(STORE_BOOKMARKS_NAME);
+  const index = store.index('by_bookId');
+  const request = index.getAll(currentBookId);
 
-  const ul = document.createElement('ul');
-  bookBookmarks.sort((a, b) => a.created - b.created).forEach((bookmark) => {
-    const li = document.createElement('li');
+  request.onsuccess = () => {
+    const bookBookmarks = request.result || [];
 
-    const a = document.createElement('a');
-    a.href = '#';
+    const ul = document.createElement('ul');
+    bookBookmarks.sort((a, b) => a.created - b.created).forEach((bookmark) => {
+      const li = document.createElement('li');
 
-    const created = new Date(bookmark.created);
-    const dateString = created.toLocaleString();
-    let text = bookmark.text;
-    if (text === 'Bookmark' || !text) {
-      text = `Bookmark from ${dateString}`;
-    } else {
-      text = `${text}... (${dateString})`;
-    }
-    a.textContent = text;
+      const a = document.createElement('a');
+      a.href = '#';
 
-    a.addEventListener('click', async (event) => {
-      event.preventDefault();
-      // The gotoCFI function now returns a promise that resolves when
-      // navigation is complete. We wait for it, and then hide the overlay.
-      try {
-        await gotoCFI(bookmark.cfi);
-        toggleOverlay('bookmarks');
-      } catch (e) {
-        console.error("Error navigating to CFI:", e);
-        // On error, we leave the overlay open as a visual indicator.
+      const created = new Date(bookmark.created);
+      const dateString = created.toLocaleString();
+      let text = bookmark.text;
+      if (text === 'Bookmark' || !text) {
+        text = `Bookmark from ${dateString}`;
+      } else {
+        text = `${text}... (${dateString})`;
       }
+      a.textContent = text;
+
+      a.addEventListener('click', async (event) => {
+        event.preventDefault();
+        try {
+          await gotoCFI(bookmark.cfi);
+          toggleOverlay('bookmarks');
+        } catch (e) {
+          console.error("Error navigating to CFI:", e);
+        }
+      });
+
+      const deleteButton = document.createElement('button');
+      deleteButton.textContent = 'X';
+      deleteButton.className = 'delete-bookmark';
+      deleteButton.addEventListener('click', async () => {
+        await deleteBookmark(bookmark.id);
+        await generateBookmarksList(); // Refresh list
+      });
+
+      li.appendChild(a);
+      li.appendChild(deleteButton);
+      ul.appendChild(li);
     });
+    tocOverlay.appendChild(ul);
 
-    const deleteButton = document.createElement('button');
-    deleteButton.textContent = 'X';
-    deleteButton.className = 'delete-bookmark';
-    deleteButton.addEventListener('click', async () => {
-      await deleteBookmark(bookmark.cfi);
-      await generateBookmarksList(); // Refresh list
-    });
+    if (bookBookmarks.length === 0) {
+      const p = document.createElement('p');
+      p.textContent = 'No bookmarks for this book.';
+      tocOverlay.appendChild(p);
+    }
+  };
 
-    li.appendChild(a);
-    li.appendChild(deleteButton);
-    ul.appendChild(li);
-  });
-  tocOverlay.appendChild(ul);
-
-  if (bookBookmarks.length === 0) {
+  request.onerror = (event) => {
+    console.error('Error fetching bookmarks:', event.target.error);
     const p = document.createElement('p');
-    p.textContent = 'No bookmarks for this book.';
+    p.textContent = 'Error loading bookmarks.';
     tocOverlay.appendChild(p);
-  }
+  };
 }
 
 async function gotoCFI(cfi) {
@@ -377,9 +438,27 @@ async function addNewBookmark() {
 
   const cfi = currentRendition.currentLocation().start.cfi;
 
-  const bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
-  const bookBookmarks = bookmarks[currentBookId] || [];
-  if (bookBookmarks.some(b => b.cfi === cfi)) {
+  const existing = await new Promise((resolve, reject) => {
+    const trans = db.transaction([STORE_BOOKMARKS_NAME], 'readonly');
+    const store = trans.objectStore(STORE_BOOKMARKS_NAME);
+    const index = store.index('by_bookId');
+    const request = index.openCursor(IDBKeyRange.only(currentBookId));
+    let found = false;
+    request.onsuccess = event => {
+      const cursor = event.target.result;
+      if (cursor) {
+        if (cursor.value.cfi === cfi) {
+          found = true;
+        }
+        cursor.continue();
+      } else {
+        resolve(found);
+      }
+    };
+    request.onerror = event => reject(event.target.error);
+  });
+
+  if (existing) {
     alert("Bookmark for this location already exists.");
     return;
   }
@@ -400,28 +479,33 @@ async function addNewBookmark() {
   }
 
   const newBookmark = {
+    bookId: currentBookId,
     cfi: cfi,
     text: textSnippet,
     created: Date.now()
   };
 
-  if (!bookmarks[currentBookId]) {
-    bookmarks[currentBookId] = [];
-  }
-  bookmarks[currentBookId].push(newBookmark);
-  localStorage.setItem('ler-bookmarks', JSON.stringify(bookmarks));
+  const transaction = db.transaction([STORE_BOOKMARKS_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_BOOKMARKS_NAME);
+  store.add(newBookmark);
+
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = resolve;
+    transaction.onerror = event => reject(event.target.error);
+  });
 }
 
-async function deleteBookmark(cfi) {
+async function deleteBookmark(bookmarkId) {
   if (!currentBookId) return;
 
-  const bookmarks = JSON.parse(localStorage.getItem('ler-bookmarks')) || {};
-  let bookBookmarks = bookmarks[currentBookId] || [];
+  const transaction = db.transaction([STORE_BOOKMARKS_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_BOOKMARKS_NAME);
+  store.delete(bookmarkId);
 
-  bookBookmarks = bookBookmarks.filter(b => b.cfi !== cfi);
-
-  bookmarks[currentBookId] = bookBookmarks;
-  localStorage.setItem('ler-bookmarks', JSON.stringify(bookmarks));
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = resolve;
+    transaction.onerror = event => reject(event.target.error);
+  });
 }
 
 async function nextPage() {
