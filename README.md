@@ -55,21 +55,29 @@ the browser's IndexedDB.
       allows for easy navigation. Users can jump to chapters via the
       TOC or create/delete/navigate to bookmarks. The view can be
       switched between TOC and Bookmarks without closing the overlay.
-    *   **Auto-Hiding Controls**: The main navigation buttons automatically
-      fade out during reading. They reappear on mouse movement or a tap
-      in the center of the screen.
+    *   **Immersive Reader Interface**:
+        *   **Auto-Hiding Controls**: To minimize distractions, the top
+          control bar and the side page-turn buttons automatically fade
+          out during reading. They reappear on mouse movement or a tap
+          on the main content area.
+        *   **Book Title Display**: The title of the current book is
+          shown in the center of the top control bar.
+        *   **Intuitive Display Controls**: Font size and line height are
+          managed with "pill" shaped controls that always show the
+          current value (e.g., "120%", "1.8").
     *   **Keyboard Navigation**:
         *   `ArrowLeft` / `ArrowRight`: Navigate between pages.
         *   `+` / `-`: Increase or decrease the font size.
         *   `[` / `]`: Increase or decrease the line spacing.
         *   `0`: Reset font size and line height to default.
+    *   **Interactive Content**: The main content area of the book is
+      fully interactive, allowing you to click on hyperlinks within
+      the EPUB text (e.g., in a table of contents page).
     *   **Touch & Mouse Navigation**:
-        *   Tap/click on the left or right 25% of the screen to turn
-          pages.
-        *   Tap/click on the center 50% of the screen to show the
-          navigation controls.
-    *   **On-Screen Display Controls**: Buttons are available to
-      increase/decrease font size and line height.
+        *   Click the thumb-sized `‹` and `›` buttons on the left and
+          right edges of the screen to turn pages.
+        *   Move the mouse or tap/click on the book's main content
+          area (but not on a link) to show the navigation controls.
     *   **Close Reader**: Return to the book management view.
 
 ## How to Use
@@ -89,16 +97,15 @@ the browser's IndexedDB.
     delete it or change its state.
 6.  **Navigate**:
     *   **Keyboard**: Use the `ArrowLeft` and `ArrowRight` keys.
-    *   **Touch/Mouse**: Tap or click on the left/right edges of the
-      screen.
-7.  **Show Controls**: Move your mouse, or tap/click the center of the
-    screen.
-8.  **Adjust Display**: Use the on-screen `A+`/`A-` buttons for font
-    size, `+`/`-` buttons for line height, or the corresponding
-    keyboard shortcuts (`+`/`-`/`[`/`]`). Press `0` to reset.
-9.  **Use TOC/Bookmarks**: Click the "TOC" or "Bookmark" buttons to
-    access those features.
-10. **Close the Book**: Click the "Close" button to return to the book
+    *   **Touch/Mouse**: Click the `‹` and `›` buttons on the screen
+      edges.
+7.  **Show Controls**: Move your mouse, or tap/click the book's text.
+8.  **Adjust Display**: Use the on-screen pill controls to adjust font
+    size and line height, or use the corresponding keyboard shortcuts
+    (`+`/`-`/`[`/`]`). Press `0` to reset.
+9.  **Use TOC/Bookmarks**: Click the `☰` (Table of Contents) or `🔖`
+    (Bookmark) buttons to access those features.
+10. **Close the Book**: Click the `X` button to return to the book
     grid. Your position will be saved.
 
 ## Planned and Missing Features
