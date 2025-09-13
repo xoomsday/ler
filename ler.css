@@ -188,6 +188,12 @@ h1 {
   right: 1em;
   z-index: 5;
   transition: opacity 0.5s ease-in-out;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0.5em;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  gap: 1em;
 }
 
 #reader-controls.controls-hidden {
@@ -196,13 +202,54 @@ h1 {
 }
 
 #reader-controls button {
-  margin-right: 1em;
+  margin-right: 0;
 }
 
 #reader-controls #close-reader {
-  float: right;
-  margin-right: 0;
+  order: 99; /* Push to the end */
+  margin-left: auto;
 }
+
+.control-pill {
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 15px;
+  padding: 2px;
+}
+
+.control-pill button {
+  border: none;
+  background: #ccc;
+  color: #333;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 1.2em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.control-pill button:hover {
+  background: #bbb;
+}
+
+.control-pill span {
+  padding: 0 0.8em;
+  font-size: 0.9em;
+  min-width: 40px;
+  text-align: center;
+}
+
+#book-title-display {
+  flex-grow: 1;
+  text-align: center;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 
 #reader-view {
   position: fixed;

@@ -266,6 +266,7 @@ async function increaseFontSize() {
   if (!currentRendition) return;
   currentFontSize += 10;
   currentRendition.themes.fontSize(currentFontSize + '%');
+  document.getElementById('font-size-value').textContent = currentFontSize + '%';
   await saveBookSettings();
 }
 
@@ -274,22 +275,25 @@ async function decreaseFontSize() {
   if (currentFontSize > 10) {
     currentFontSize -= 10;
     currentRendition.themes.fontSize(currentFontSize + '%');
+    document.getElementById('font-size-value').textContent = currentFontSize + '%';
     await saveBookSettings();
   }
 }
 
 async function increaseLineHeight() {
   if (!currentRendition) return;
-  currentLineHeight += 0.1;
+  currentLineHeight = parseFloat((currentLineHeight + 0.1).toFixed(1));
   currentRendition.themes.override('line-height', currentLineHeight);
+  document.getElementById('line-height-value').textContent = currentLineHeight;
   await saveBookSettings();
 }
 
 async function decreaseLineHeight() {
   if (!currentRendition) return;
   if (currentLineHeight > 1) {
-    currentLineHeight -= 0.1;
+    currentLineHeight = parseFloat((currentLineHeight - 0.1).toFixed(1));
     currentRendition.themes.override('line-height', currentLineHeight);
+    document.getElementById('line-height-value').textContent = currentLineHeight;
     await saveBookSettings();
   }
 }
@@ -300,6 +304,8 @@ async function resetFontSettings() {
   currentLineHeight = 1.5;
   currentRendition.themes.fontSize(currentFontSize + '%');
   currentRendition.themes.override('line-height', currentLineHeight);
+  document.getElementById('font-size-value').textContent = currentFontSize + '%';
+  document.getElementById('line-height-value').textContent = currentLineHeight;
   await saveBookSettings();
 }
 
@@ -1020,6 +1026,9 @@ function openRendition(bookData, metadata) {
     }
   }
 
+  document.getElementById('font-size-value').textContent = currentFontSize + '%';
+  document.getElementById('line-height-value').textContent = currentLineHeight;
+
   const cfi = metadata ? metadata.lastLocation : null;
 
   document.getElementById('book-management').style.display = 'none';
@@ -1031,6 +1040,10 @@ function openRendition(bookData, metadata) {
   showControls(); // Show controls when book is opened
 
   currentBook = ePub(bookData);
+
+  currentBook.loaded.metadata.then(meta => {
+    document.getElementById('book-title-display').textContent = meta.title;
+  });
 
   currentBook.ready.then(async () => {
     currentBookLocationsPromise = currentBook.locations.generate();
