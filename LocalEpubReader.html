@@ -12,10 +12,24 @@
   <h1>Local ePUB Reader</h1>
 
   <div id="book-management">
-    <h2>Book Management</h2>
-    <label for="epub-upload" class="button-like-label">Add a new book</label>
-    <input type="file" id="epub-upload" accept=".epub" style="display: none;" multiple>
-    <div id="book-list"></div>
+    <div id="top-pane">
+      <label for="epub-upload" class="button-like-label">+</label>
+      <input type="file" id="epub-upload" accept=".epub" style="display: none;" multiple>
+      <div id="filters">
+        <span>Filter by state:</span>
+        <label><input type="checkbox" name="state" value="unopened" checked> Unopened</label>
+        <label><input type="checkbox" name="state" value="reading" checked> Reading</label>
+        <label><input type="checkbox" name="state" value="finished" checked> Finished</label>
+      </div>
+      <div id="sorting">
+        <span>Sort by:</span>
+        <select id="sort-by">
+          <option value="title">Title</option>
+          <option value="last-read">Last Read</option>
+        </select>
+      </div>
+    </div>
+    <div id="book-grid"></div>
   </div>
 
   <div id="reader-view" style="display: none;">

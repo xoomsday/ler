@@ -17,14 +17,31 @@ the browser's IndexedDB.
 
 *   **Offline-First PWA**: Can be installed to the home screen and used
     entirely without a network connection after the initial visit.
-*   **Book Management**:
-    *   **Upload Books**: Add EPUB files from your local device with a
-      clean, simple button. Multiple files can be selected and
-      uploaded at once.
+*   **Modern Book Management**:
+    *   **Grid View**: Displays your library as a grid of book tiles,
+      each showing a cover thumbnail, title, and progress bar.
+    *   **Upload Books**: Add EPUB files from your local device with the
+      `+` button. Multiple files can be selected and uploaded at once.
+    *   **Cover Thumbnails**: Automatically extracts and displays a
+      resized thumbnail of the book's cover for quick identification.
+    *   **Reading Progress**: A progress bar on each tile shows your
+      current position in the book.
+    *   **Book States**: Each book is automatically tracked with one of
+      three states, shown as an overlay on the cover:
+        *   **Unopened**: A newly added book.
+        *   **Reading**: A book you have started reading.
+        *   **Finished**: A book you have read to the end.
+    *   **Filtering and Sorting**:
+        *   Filter your library to show any combination of states
+          (e.g., only "Reading" and "Finished" books).
+        *   Sort books by title (with version-aware sorting for series)
+          or by the last time they were read.
+    *   **Book Actions**: A hamburger menu on each tile allows you to:
+        *   **Delete** the book from your library.
+        *   **Reset the state** manually to Unopened, Reading, or
+          Finished.
     *   **Local Storage**: EPUB files and user metadata are stored
       persistently in the browser's IndexedDB.
-    *   **Book Listing**: View a list of all uploaded books on the main
-      management screen.
 *   **Reader View**:
     *   **Remembers Your Place**: The application automatically saves
       your last reading position on every page turn and returns you to
@@ -63,40 +80,36 @@ the browser's IndexedDB.
     http.server` or a similar tool.
 2.  **Open the Application**: Navigate to `LocalEpubReader.html` in your
     browser.
-3.  **Upload a Book**: Click the "Add a new book" button and select an
-    `.epub` file. It will appear in the book list.
-4.  **Read a Book**: Click the "Read" button next to a book's name. It
-    will open to your last read position.
-5.  **Navigate**:
+3.  **Upload a Book**: Click the `+` button in the top pane and select
+    one or more `.epub` files. They will appear in the book grid.
+4.  **Read a Book**: Click on a book's tile. It will open to your last
+    read position.
+5.  **Manage Books**: Use the filter and sort controls in the top pane
+    to organize your library. Use the hamburger menu on a book tile to
+    delete it or change its state.
+6.  **Navigate**:
     *   **Keyboard**: Use the `ArrowLeft` and `ArrowRight` keys.
     *   **Touch/Mouse**: Tap or click on the left/right edges of the
       screen.
-6.  **Show Controls**: Move your mouse, or tap/click the center of the
+7.  **Show Controls**: Move your mouse, or tap/click the center of the
     screen.
-7.  **Adjust Display**: Use the on-screen `A+`/`A-` buttons for font
+8.  **Adjust Display**: Use the on-screen `A+`/`A-` buttons for font
     size, `+`/`-` buttons for line height, or the corresponding
     keyboard shortcuts (`+`/`-`/`[`/`]`). Press `0` to reset.
-8.  **Use TOC/Bookmarks**: Click the "TOC" or "Bookmark" buttons to
+9.  **Use TOC/Bookmarks**: Click the "TOC" or "Bookmark" buttons to
     access those features.
-9.  **Close the Book**: Click the "Close" button to return to the book
-    list. Your position will be saved.
+10. **Close the Book**: Click the "Close" button to return to the book
+    grid. Your position will be saved.
 
 ## Planned and Missing Features
 
 This section details features that are part of the project's vision but
 are not yet implemented.
 
-*   **Delete Books**: There is currently no way to remove a book from
-    the library once it has been uploaded.
-*   **Advanced Book Management**: The library view is a simple list.
-    Features like sorting (by author, title, last read) or grouping are
-    not available.
 *   **Full Page Progression and Writing Mode Support**: While basic RTL
     support is present, comprehensive testing and support for all
     `page-progression-direction` and `writing-mode` (e.g.,
     vertical-rl) CSS attributes are not yet implemented.
-*   **Tracking Reading Time**: The application does not yet track when a
-    book was last opened or read.
 
 ## Technology Stack
 
