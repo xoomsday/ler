@@ -580,34 +580,54 @@ async function handleKeyPress(event) {
   }
 }
 
-function handleFileUpload(event) {
-  const file = event.target.files[0];
-  if (!file) {
+async function handleFileUpload(event) {
+  const files = event.target.files;
+  if (!files.length) {
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const bookData = e.target.result;
-    storeBook(file.name, bookData);
-  };
-  reader.readAsArrayBuffer(file);
+  const promises = [];
+  for (const file of files) {
+    const promise = new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const bookData = e.target.result;
+        storeBook(file.name, bookData).then(resolve).catch(reject);
+      };
+      reader.onerror = (e) => {
+        reject(new Error(`Error reading file: ${file.name}`));
+      };
+      reader.readAsArrayBuffer(file);
+    });
+    promises.push(promise);
+  }
+
+  try {
+    await Promise.all(promises);
+    displayBooks();
+  } catch (error) {
+    console.error("An error occurred during file upload:", error);
+    // Optionally, display an error message to the user
+  }
 }
 
 function storeBook(name, data) {
-  const transaction = db.transaction([STORE_BOOKS_NAME], 'readwrite');
-  const store = transaction.objectStore(STORE_BOOKS_NAME);
-  const book = { name, data };
-  const request = store.add(book);
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_BOOKS_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_BOOKS_NAME);
+    const book = { name, data };
+    const request = store.add(book);
 
-  request.onsuccess = () => {
-    console.log('Book stored successfully');
-    displayBooks();
-  };
+    request.onsuccess = () => {
+      console.log('Book stored successfully');
+      resolve();
+    };
 
-  request.onerror = (event) => {
-    console.error('Error storing book:', event.target.errorCode);
-  };
+    request.onerror = (event) => {
+      console.error('Error storing book:', event.target.errorCode);
+      reject(event.target.errorCode);
+    };
+  });
 }
 
 function displayBooks() {

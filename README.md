@@ -19,7 +19,8 @@ the browser's IndexedDB.
     entirely without a network connection after the initial visit.
 *   **Book Management**:
     *   **Upload Books**: Add EPUB files from your local device with a
-      clean, simple button.
+      clean, simple button. Multiple files can be selected and
+      uploaded at once.
     *   **Local Storage**: EPUB files and user metadata are stored
       persistently in the browser's IndexedDB.
     *   **Book Listing**: View a list of all uploaded books on the main
@@ -90,9 +91,6 @@ are not yet implemented.
 *   **Advanced Book Management**: The library view is a simple list.
     Features like sorting (by author, title, last read) or grouping are
     not available.
-*   **Bookmark Migration**: The bookmark data is still stored in
-    `localStorage` and should be migrated to `IndexedDB` for better
-    performance and consistency.
 *   **Full Page Progression and Writing Mode Support**: While basic RTL
     support is present, comprehensive testing and support for all
     `page-progression-direction` and `writing-mode` (e.g.,
