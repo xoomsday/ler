@@ -19,7 +19,12 @@ let isClosing = false;
 
 function showControls() {
   const controls = document.getElementById('reader-controls');
+  const prevPage = document.getElementById('prev-page-area');
+  const nextPage = document.getElementById('next-page-area');
+
   controls.classList.remove('controls-hidden');
+  prevPage.classList.remove('controls-hidden');
+  nextPage.classList.remove('controls-hidden');
 
   clearTimeout(controlsTimer);
   controlsTimer = setTimeout(hideControls, 3000);
@@ -27,7 +32,12 @@ function showControls() {
 
 function hideControls() {
   const controls = document.getElementById('reader-controls');
+  const prevPage = document.getElementById('prev-page-area');
+  const nextPage = document.getElementById('next-page-area');
+
   controls.classList.add('controls-hidden');
+  prevPage.classList.add('controls-hidden');
+  nextPage.classList.add('controls-hidden');
 }
 
 function addMouseHandlers(element) {
@@ -139,25 +149,26 @@ window.addEventListener('load', async () => {
 
 
   const prevPageArea = document.getElementById('prev-page-area');
-  prevPageArea.addEventListener('click', () => {
+  prevPageArea.addEventListener('click', (event) => {
     if (currentBookDirection === 'rtl') {
       nextPage();
     } else {
       prevPage();
     }
+    clearTimeout(controlsTimer);
+    controlsTimer = setTimeout(hideControls, 3000);
   });
 
   const nextPageArea = document.getElementById('next-page-area');
-  nextPageArea.addEventListener('click', () => {
+  nextPageArea.addEventListener('click', (event) => {
     if (currentBookDirection === 'rtl') {
       prevPage();
     } else {
       nextPage();
     }
+    clearTimeout(controlsTimer);
+    controlsTimer = setTimeout(hideControls, 3000);
   });
-
-  const centerPageArea = document.getElementById('center-page-area');
-  centerPageArea.addEventListener('click', showControls);
 
   const filterCheckboxes = document.querySelectorAll('#filters input[name="state"]');
   filterCheckboxes.forEach(cb => cb.addEventListener('change', displayBooks));
@@ -1036,7 +1047,7 @@ function openRendition(bookData, metadata) {
   readerView.style.display = 'block';
 
   window.addEventListener('keydown', handleKeyPress);
-  addMouseHandlers(readerView);
+  readerView.addEventListener('mousemove', showControls);
   showControls(); // Show controls when book is opened
 
   currentBook = ePub(bookData);

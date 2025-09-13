@@ -196,7 +196,9 @@ h1 {
   gap: 1em;
 }
 
-#reader-controls.controls-hidden {
+#reader-controls.controls-hidden,
+#prev-page-area.controls-hidden,
+#next-page-area.controls-hidden {
   opacity: 0;
   pointer-events: none;
 }
@@ -301,24 +303,41 @@ h1 {
   margin-left: 1em;
 }
 
-#prev-page-area, #center-page-area, #next-page-area {
+#prev-page-area, #next-page-area {
   position: absolute;
-  top: 0;
-  height: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 80px;
+  background: rgba(0, 0, 0, 0.15);
   z-index: 3; /* Above the viewer but below controls */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2em;
+  color: rgba(0, 0, 0, 0.4);
+  transition: opacity 0.5s ease-in-out, background-color 0.2s;
+}
+
+#prev-page-area:hover, #next-page-area:hover {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 #prev-page-area {
   left: 0;
-  width: 25%;
+  border-radius: 0 10px 10px 0;
 }
 
-#center-page-area {
-  left: 25%;
-  width: 50%;
+#prev-page-area::after {
+  content: '‹';
 }
 
 #next-page-area {
   right: 0;
-  width: 25%;
+  border-radius: 10px 0 0 10px;
+}
+
+#next-page-area::after {
+  content: '›';
 }
