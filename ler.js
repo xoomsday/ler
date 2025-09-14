@@ -201,8 +201,9 @@ async function closeReader() {
   isClosing = false; // Release the lock
 }
 
-async function saveLastLocation() {
-  if (!currentRendition || !currentBookId || !currentBook || !currentBookLocationsPromise) {
+async function saveLastLocation(setFinished) {
+  if (!currentRendition || !currentBookId || !currentBook ||
+      !currentBookLocationsPromise) {
     return; // Nothing to save or generation not started
   }
 
@@ -233,6 +234,9 @@ async function saveLastLocation() {
       request.onsuccess = () => {
         const data = request.result || { bookId: currentBookId };
         data.lastLocation = cfi;
+	if (setFinished) {
+          data.state = 'finished';
+	}
         if (Number.isFinite(progress)) {
           data.progress = progress;
         }
@@ -555,6 +559,7 @@ async function deleteBookmark(bookmarkId) {
 async function nextPage() {
   if (!currentRendition) return;
 
+  let setFinished = false;
   let atSectionEnd = false;
   if (currentRendition.location) {
     const { end } = currentRendition.location;
@@ -568,19 +573,7 @@ async function nextPage() {
     if (nextSection) {
       promise = currentRendition.display(nextSection.href);
     } else {
-      // Reached the end of the book
-      const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_METADATA_NAME);
-      const request = store.get(currentBookId);
-      request.onsuccess = () => {
-        const data = request.result;
-        if (data) {
-          data.state = 'finished';
-          store.put(data);
-        }
-      };
-      // Even at the end, we call saveLastLocation to correctly record the final progress
-      await saveLastLocation();
+      setFinished = true;
     }
   } else {
     promise = currentRendition.next();
@@ -588,8 +581,8 @@ async function nextPage() {
 
   if (promise) {
     await promise;
-    await saveLastLocation();
   }
+  await saveLastLocation(setFinished);
 }
 
 async function prevPage() {
