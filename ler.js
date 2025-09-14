@@ -687,7 +687,7 @@ function storeBook(name, data) {
 
       request.onsuccess = (event) => {
         const bookId = event.target.result;
-        const metadata = { bookId: bookId, state: 'unopened', progress: 0 };
+        const metadata = { bookId: bookId, state: 'unread', progress: 0 };
         metadataStore.add(metadata);
       };
 
@@ -784,7 +784,7 @@ function updateBookState(bookId, state) {
     const data = request.result;
     if (data) {
       data.state = state;
-      if (state === 'unopened') {
+      if (state === 'unread') {
         data.progress = 0;
         delete data.lastLocation;
       } else if (state === 'finished') {
@@ -895,7 +895,7 @@ function displayBooks() {
         resetMenu.innerHTML = '<hr><span>Reset State:</span>';
         menuContent.appendChild(resetMenu);
 
-        const states = ['unopened', 'reading', 'finished'];
+        const states = ['unread', 'reading', 'finished'];
         states.forEach(state => {
           const link = document.createElement('a');
           link.href = '#';
@@ -982,8 +982,8 @@ function openBook(bookId) {
         metadataRecord.progress = 0;
         needsUpdate = true;
       }
-      // Update state to 'reading' if it's 'unopened'
-      if (metadataRecord.state === 'unopened') {
+      // Update state to 'reading' if it's 'unread'
+      if (metadataRecord.state === 'unread') {
         metadataRecord.state = 'reading';
         needsUpdate = true;
       }

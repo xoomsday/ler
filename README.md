@@ -28,7 +28,7 @@ the browser's IndexedDB.
       current position in the book.
     *   **Book States**: Each book is automatically tracked with one of
       three states, shown as an overlay on the cover:
-        *   **Unopened**: A newly added book.
+        *   **Unread**: A newly added book.
         *   **Reading**: A book you have started reading.
         *   **Finished**: A book you have read to the end.
     *   **Filtering and Sorting**:
@@ -38,7 +38,7 @@ the browser's IndexedDB.
           or by the last time they were read.
     *   **Book Actions**: A hamburger menu on each tile allows you to:
         *   **Delete** the book from your library.
-        *   **Reset the state** manually to Unopened, Reading, or
+        *   **Reset the state** manually to Unread, Reading, or
           Finished.
     *   **Local Storage**: EPUB files and user metadata are stored
       persistently in the browser's IndexedDB.
