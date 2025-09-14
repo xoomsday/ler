@@ -786,6 +786,7 @@ function updateBookState(bookId, state) {
       data.state = state;
       if (state === 'unopened') {
         data.progress = 0;
+        delete data.lastLocation;
       } else if (state === 'finished') {
         data.progress = 1;
       }
