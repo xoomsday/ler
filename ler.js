@@ -13,6 +13,7 @@ let currentBookId = null;
 let currentBookDirection = 'ltr';
 let currentFontSize = 100;
 let currentLineHeight = 1.5;
+let isDarkMode = false;
 let controlsTimer = null;
 let currentBookLocationsPromise = null;
 let isClosing = false;
@@ -126,6 +127,11 @@ async function migrateBookmarksFromLocalStorage() {
 }
 
 window.addEventListener('load', async () => {
+  if (localStorage.getItem('ler-dark-mode') === 'true') {
+    isDarkMode = true;
+    document.body.classList.add('dark-mode');
+  }
+
   await initDB();
   await migrateBookmarksFromLocalStorage();
   displayBooks();
@@ -146,6 +152,7 @@ window.addEventListener('load', async () => {
   document.getElementById('font-size-inc').addEventListener('click', increaseFontSize);
   document.getElementById('line-height-dec').addEventListener('click', decreaseLineHeight);
   document.getElementById('line-height-inc').addEventListener('click', increaseLineHeight);
+  document.getElementById('dark-mode-toggle').addEventListener('click', toggleDarkMode);
 
 
   const prevPageArea = document.getElementById('prev-page-area');
@@ -310,6 +317,27 @@ async function decreaseLineHeight() {
     currentRendition.themes.override('line-height', currentLineHeight);
     document.getElementById('line-height-value').textContent = currentLineHeight;
     await saveBookSettings();
+  }
+}
+
+async function toggleDarkMode() {
+  isDarkMode = !isDarkMode;
+  localStorage.setItem('ler-dark-mode', isDarkMode);
+
+  if (isDarkMode) {
+    document.body.classList.add('dark-mode');
+  } else {
+    document.body.classList.remove('dark-mode');
+  }
+
+  if (currentRendition) {
+    if (isDarkMode) {
+      currentRendition.themes.override('color', '#e0e0e0');
+      currentRendition.themes.override('background', '#121212');
+    } else {
+      currentRendition.themes.override('color', ''); // Revert to default
+      currentRendition.themes.override('background', ''); // Revert to default
+    }
   }
 }
 
@@ -1068,6 +1096,10 @@ function openRendition(bookData, metadata) {
     // Apply themes that might have been set before rendition was ready
     currentRendition.themes.fontSize(currentFontSize + '%');
     currentRendition.themes.override('line-height', currentLineHeight);
+    if (isDarkMode) {
+      currentRendition.themes.override('color', '#e0e0e0');
+      currentRendition.themes.override('background', '#121212');
+    }
 
     if (cfi) {
       await gotoCFI(cfi);

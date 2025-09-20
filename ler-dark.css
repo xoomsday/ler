@@ -1,0 +1,47 @@
+/* Dark mode styles for LER */
+
+body.dark-mode {
+  background-color: #121212;
+  color: #e0e0e0;
+}
+
+.dark-mode #book-management,
+.dark-mode #reader-view {
+  background-color: #121212;
+  color: #e0e0e0;
+}
+
+.dark-mode .button-like-label,
+.dark-mode #reader-controls button,
+.dark-mode #sorting select {
+  background-color: #333;
+  color: #e0e0e0;
+  border-color: #555;
+}
+
+.dark-mode .control-pill {
+  background-color: #333;
+  color: #e0e0e0;
+}
+
+.dark-mode .book-tile {
+  background-color: #1e1e1e;
+  border-color: #333;
+}
+
+.dark-mode .book-title {
+  color: #e0e0e0;
+}
+
+.dark-mode #toc-overlay {
+  background-color: rgba(0, 0, 0, 0.9);
+  color: #e0e0e0;
+}
+
+.dark-mode #toc-overlay a {
+  color: #bb86fc;
+}
+
+.dark-mode #viewer {
+  background-color: #121212;
+}

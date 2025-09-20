@@ -5,6 +5,7 @@ self.addEventListener('install', (e) => {
         './',
         './LocalEpubReader.html',
         './ler.css',
+        './ler-dark.css',
         './ler.js',
         './jszip.min.js',
         './epub.min.js',
