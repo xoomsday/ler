@@ -13,6 +13,7 @@ let currentBookId = null;
 let currentBookDirection = 'ltr';
 let currentFontSize = 100;
 let currentLineHeight = 1.5;
+let currentFont = 'sans-serif';
 let isDarkMode = false;
 let controlsTimer = null;
 let currentBookLocationsPromise = null;
@@ -153,6 +154,7 @@ window.addEventListener('load', async () => {
   document.getElementById('line-height-dec').addEventListener('click', decreaseLineHeight);
   document.getElementById('line-height-inc').addEventListener('click', increaseLineHeight);
   document.getElementById('dark-mode-toggle').addEventListener('click', toggleDarkMode);
+  document.getElementById('font-toggle').addEventListener('click', toggleFont);
 
 
   const prevPageArea = document.getElementById('prev-page-area');
@@ -279,6 +281,7 @@ function saveBookSettings() {
       const data = request.result || { bookId: currentBookId };
       data.fontSize = currentFontSize;
       data.lineHeight = currentLineHeight;
+      data.font = currentFont;
       store.put(data);
     };
   });
@@ -341,12 +344,37 @@ async function toggleDarkMode() {
   }
 }
 
+async function toggleFont() {
+  if (!currentRendition) return;
+  if (currentFont === 'serif') {
+    currentFont = 'sans-serif';
+  } else {
+    currentFont = 'serif';
+  }
+  await applyFont();
+  await saveBookSettings();
+}
+
+async function applyFont() {
+  if (!currentRendition) return;
+  const fontToggleButton = document.getElementById('font-toggle');
+  if (currentFont === 'serif') {
+    currentRendition.themes.select('serif');
+    fontToggleButton.classList.add('serif');
+  } else {
+    currentRendition.themes.select('sans');
+    fontToggleButton.classList.remove('serif');
+  }
+}
+
 async function resetFontSettings() {
   if (!currentRendition) return;
   currentFontSize = 100;
   currentLineHeight = 1.5;
+  currentFont = 'sans-serif';
   currentRendition.themes.fontSize(currentFontSize + '%');
   currentRendition.themes.override('line-height', currentLineHeight);
+  await applyFont();
   document.getElementById('font-size-value').textContent = currentFontSize + '%';
   document.getElementById('line-height-value').textContent = currentLineHeight;
   await saveBookSettings();
@@ -655,6 +683,9 @@ async function handleKeyPress(event) {
       break;
     case '0':
       resetFontSettings();
+      break;
+    case 'f':
+      toggleFont();
       break;
   }
 }
@@ -1049,6 +1080,7 @@ function openRendition(bookData, metadata) {
   // Reset settings to default before applying book-specific ones
   currentFontSize = 100;
   currentLineHeight = 1.5;
+  currentFont = 'sans-serif';
 
   if (metadata) {
     if (metadata.fontSize) {
@@ -1056,6 +1088,9 @@ function openRendition(bookData, metadata) {
     }
     if (metadata.lineHeight) {
       currentLineHeight = metadata.lineHeight;
+    }
+    if (metadata.font) {
+      currentFont = metadata.font;
     }
   }
 
@@ -1084,6 +1119,11 @@ function openRendition(bookData, metadata) {
 
     currentRendition = currentBook.renderTo('viewer', { width: '100%', height: '100%' });
 
+    currentRendition.themes.register({
+      serif: { 'body': { 'font-family': '"MS PMincho", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "serif-ja", serif !important' } },
+      sans: { 'body': { 'font-family': '"Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", "sans-serif-ja", sans-serif !important' } }
+    });
+
     currentRendition.on('rendered', () => {
       const view = currentRendition.manager.views.last();
       if (view && view.iframe) {
@@ -1096,6 +1136,7 @@ function openRendition(bookData, metadata) {
     // Apply themes that might have been set before rendition was ready
     currentRendition.themes.fontSize(currentFontSize + '%');
     currentRendition.themes.override('line-height', currentLineHeight);
+    applyFont();
     if (isDarkMode) {
       currentRendition.themes.override('color', '#e0e0e0');
       currentRendition.themes.override('background', '#121212');

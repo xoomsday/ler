@@ -252,6 +252,10 @@ h1 {
   text-overflow: ellipsis;
 }
 
+#font-toggle.serif {
+  font-family: serif;
+}
+
 
 #reader-view {
   position: fixed;

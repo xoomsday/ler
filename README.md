@@ -46,9 +46,12 @@ the browser's IndexedDB.
     *   **Remembers Your Place**: The application automatically saves
       your last reading position on every page turn and returns you to
       it when you reopen a book.
-    *   **Per-Book Display Settings**: Font size and line height are
-      saved for each book individually and restored when the book is
-      reopened.
+    *   **Per-Book Display Settings**: Font size, line height, and font
+      face (serif/sans-serif) are saved for each book individually and
+      restored when the book is reopened.
+    *   **Dark Mode**: A simple toggle allows switching the entire
+      application, including the book content, to a dark theme for
+      comfortable night reading. The setting is saved globally.
     *   **EPUB Rendering**: Opens and displays EPUB files using the
       `epub.js` library.
     *   **Table of Contents (TOC) & Bookmarking**: A unified overlay
@@ -62,14 +65,15 @@ the browser's IndexedDB.
           on the main content area.
         *   **Book Title Display**: The title of the current book is
           shown in the center of the top control bar.
-        *   **Intuitive Display Controls**: Font size and line height are
-          managed with "pill" shaped controls that always show the
-          current value (e.g., "120%", "1.8").
+        *   **Intuitive Display Controls**: Font size, line height, and
+          font face are managed with "pill" shaped controls that always
+          show the current value.
     *   **Keyboard Navigation**:
         *   `ArrowLeft` / `ArrowRight`: Navigate between pages.
         *   `+` / `-`: Increase or decrease the font size.
         *   `[` / `]`: Increase or decrease the line spacing.
-        *   `0`: Reset font size and line height to default.
+        *   `f`: Toggle between serif and sans-serif fonts.
+        *   `0`: Reset font size, line height, and font face to default.
     *   **Interactive Content**: The main content area of the book is
       fully interactive, allowing you to click on hyperlinks within
       the EPUB text (e.g., in a table of contents page).
@@ -101,8 +105,8 @@ the browser's IndexedDB.
       edges.
 7.  **Show Controls**: Move your mouse, or tap/click the book's text.
 8.  **Adjust Display**: Use the on-screen pill controls to adjust font
-    size and line height, or use the corresponding keyboard shortcuts
-    (`+`/`-`/`[`/`]`). Press `0` to reset.
+    size, line height, and font face, or use the corresponding keyboard
+    shortcuts (`+`/`-`/`[`/`]`/`f`). Press `0` to reset.
 9.  **Use TOC/Bookmarks**: Click the `☰` (Table of Contents) or `🔖`
     (Bookmark) buttons to access those features.
 10. **Close the Book**: Click the `X` button to return to the book
