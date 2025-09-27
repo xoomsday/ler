@@ -15,7 +15,7 @@
   <div id="book-management">
     <div id="top-pane">
       <label for="epub-upload" class="button-like-label">+</label>
-      <input type="file" id="epub-upload" accept=".epub" style="display: none;" multiple>
+      <input type="file" id="epub-upload" accept=".epub,.cbz" style="display: none;" multiple>
       <div id="filters">
         <span>Filter by state:</span>
         <label><input type="checkbox" name="state" value="unread" checked> Unread</label>
@@ -53,6 +53,12 @@
       </div>
       <div class="control-pill">
         <button id="font-toggle">A</button>
+      </div>
+      <div class="control-pill" id="direction-toggle-pill">
+        <button id="direction-toggle">LTR</button>
+      </div>
+      <div class="control-pill" id="spread-toggle-pill">
+        <button id="spread-toggle">Split</button>
       </div>
       <div id="book-title-display"></div>
     </div>

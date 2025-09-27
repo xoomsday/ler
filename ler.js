@@ -10,6 +10,7 @@ let db;
 let currentBook;
 let currentRendition;
 let currentBookId = null;
+let currentBookType = null;
 let currentBookDirection = 'ltr';
 let currentFontSize = 100;
 let currentLineHeight = 1.5;
@@ -18,6 +19,11 @@ let isDarkMode = false;
 let controlsTimer = null;
 let currentBookLocationsPromise = null;
 let isClosing = false;
+let comicBookPages = [];
+let currentComicPage = 0;
+let pagesCurrentlyDisplayed = 1;
+let soloPageExceptions = [];
+let comicInfoPageLayouts = new Map();
 
 function showControls() {
   const controls = document.getElementById('reader-controls');
@@ -155,7 +161,14 @@ window.addEventListener('load', async () => {
   document.getElementById('line-height-inc').addEventListener('click', increaseLineHeight);
   document.getElementById('dark-mode-toggle').addEventListener('click', toggleDarkMode);
   document.getElementById('font-toggle').addEventListener('click', toggleFont);
+  document.getElementById('direction-toggle').addEventListener('click', toggleDirection);
+  document.getElementById('spread-toggle').addEventListener('click', toggleSpread);
 
+  window.addEventListener('resize', () => {
+    if (currentBookType === 'cbz' && document.getElementById('reader-view').style.display === 'block') {
+      displayComicPage(currentComicPage);
+    }
+  });
 
   const prevPageArea = document.getElementById('prev-page-area');
   prevPageArea.addEventListener('click', (event) => {
@@ -200,10 +213,17 @@ async function closeReader() {
   document.getElementById('reader-view').style.display = 'none';
   document.getElementById('viewer').innerHTML = '';
   document.getElementById('book-management').style.display = 'block';
+
+  // Reset comic book specific things
+  readerView.classList.remove('comic-mode');
+  comicBookPages = [];
+  currentComicPage = 0;
+
   displayBooks(); // Refresh the book list
   currentRendition = null;
   currentBook = null;
   currentBookId = null;
+  currentBookType = null;
   currentBookDirection = 'ltr';
   currentBookLocationsPromise = null;
 
@@ -211,51 +231,75 @@ async function closeReader() {
 }
 
 async function saveLastLocation(setFinished) {
-  if (!currentRendition || !currentBookId || !currentBook ||
-      !currentBookLocationsPromise) {
-    return; // Nothing to save or generation not started
-  }
-
-  try {
-    await currentBookLocationsPromise; // Ensure locations are ready
-
-    let progress = null;
-    const locations = currentBook.locations;
-    const cfi = currentRendition.currentLocation().start.cfi;
-    const locationIndex = locations.locationFromCfi(cfi);
-    if (locationIndex !== -1 && locations.total > 0) {
-      progress = locationIndex / locations.total;
+  if (currentBookType === 'cbz') {
+    if (!currentBookId || comicBookPages.length === 0) {
+      return;
     }
-
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
       const store = transaction.objectStore(STORE_METADATA_NAME);
-
-      transaction.oncomplete = () => {
-        resolve();
-      };
-      transaction.onerror = (event) => {
-        console.error("Transaction error on saveLastLocation:", event.target.error);
-        reject(event.target.error);
-      };
-
       const request = store.get(currentBookId);
+
       request.onsuccess = () => {
         const data = request.result || { bookId: currentBookId };
-        data.lastLocation = cfi;
-	if (setFinished) {
+        data.lastLocation = currentComicPage.toString();
+        if (setFinished) {
           data.state = 'finished';
-	}
-        if (Number.isFinite(progress)) {
-          data.progress = progress;
         }
+        data.progress = comicBookPages.length > 0 ? (currentComicPage + 1) / comicBookPages.length : 0;
         data.lastReadTimestamp = Date.now();
         store.put(data);
       };
+      transaction.oncomplete = resolve;
+      transaction.onerror = (event) => reject(event.target.error);
     });
-  } catch (e) {
-    // This can happen if the rendition is not ready yet
-    console.warn("Could not save last location:", e);
+  } else { // EPUB
+    if (!currentRendition || !currentBookId || !currentBook ||
+        !currentBookLocationsPromise) {
+      return; // Nothing to save or generation not started
+    }
+
+    try {
+      await currentBookLocationsPromise; // Ensure locations are ready
+
+      let progress = null;
+      const locations = currentBook.locations;
+      const cfi = currentRendition.currentLocation().start.cfi;
+      const locationIndex = locations.locationFromCfi(cfi);
+      if (locationIndex !== -1 && locations.total > 0) {
+        progress = locationIndex / locations.total;
+      }
+
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_METADATA_NAME);
+
+        transaction.oncomplete = () => {
+          resolve();
+        };
+        transaction.onerror = (event) => {
+          console.error("Transaction error on saveLastLocation:", event.target.error);
+          reject(event.target.error);
+        };
+
+        const request = store.get(currentBookId);
+        request.onsuccess = () => {
+          const data = request.result || { bookId: currentBookId };
+          data.lastLocation = cfi;
+      if (setFinished) {
+            data.state = 'finished';
+      }
+          if (Number.isFinite(progress)) {
+            data.progress = progress;
+          }
+          data.lastReadTimestamp = Date.now();
+          store.put(data);
+        };
+      });
+    } catch (e) {
+      // This can happen if the rendition is not ready yet
+      console.warn("Could not save last location:", e);
+    }
   }
 }
 
@@ -364,6 +408,68 @@ async function applyFont() {
   } else {
     currentRendition.themes.select('sans');
     fontToggleButton.classList.remove('serif');
+  }
+}
+
+async function toggleDirection() {
+  if (currentBookType !== 'cbz') return;
+
+  if (currentBookDirection === 'ltr') {
+    currentBookDirection = 'rtl';
+  } else {
+    currentBookDirection = 'ltr';
+  }
+  updateDirectionButton();
+
+  // Save the new direction to metadata
+  const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_METADATA_NAME);
+  const request = store.get(currentBookId);
+  request.onsuccess = () => {
+    const data = request.result || { bookId: currentBookId };
+    data.direction = currentBookDirection;
+    store.put(data);
+  };
+  await new Promise((resolve, reject) => {
+    transaction.oncomplete = resolve;
+    transaction.onerror = reject;
+  });
+}
+
+async function toggleSpread() {
+  if (currentBookType !== 'cbz') return;
+
+  const targetPage = currentComicPage;
+
+  const exceptionIndex = soloPageExceptions.indexOf(targetPage);
+  if (exceptionIndex > -1) {
+    soloPageExceptions.splice(exceptionIndex, 1); // Rejoin
+  } else {
+    soloPageExceptions.push(targetPage); // Split
+  }
+
+  // Save metadata
+  const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_METADATA_NAME);
+  const request = store.get(currentBookId);
+  request.onsuccess = () => {
+    const data = request.result || { bookId: currentBookId };
+    data.soloPageExceptions = soloPageExceptions;
+    store.put(data);
+  };
+
+  await new Promise(resolve => transaction.oncomplete = resolve);
+
+  // Re-render the current page to reflect the change
+  await displayComicPage(currentComicPage);
+}
+
+function updateDirectionButton() {
+  const button = document.getElementById('direction-toggle');
+  if (currentBookDirection === 'rtl') {
+    button.textContent = 'RTL';
+  } else {
+    button.textContent = 'LTR';
   }
 }
 
@@ -613,42 +719,83 @@ async function deleteBookmark(bookmarkId) {
 }
 
 async function nextPage() {
-  if (!currentRendition) return;
-
-  let setFinished = false;
-  let atSectionEnd = false;
-  if (currentRendition.location) {
-    const { end } = currentRendition.location;
-    atSectionEnd = (end.displayed.page >= end.displayed.total);
-  }
-
-  let promise;
-  if (atSectionEnd) {
-    const currentSection = currentRendition.manager.views.last().section;
-    const nextSection = currentSection.next();
-    if (nextSection) {
-      promise = currentRendition.display(nextSection.href);
+  if (currentBookType === 'cbz') {
+    const nextPageNum = currentComicPage + pagesCurrentlyDisplayed;
+    if (nextPageNum < comicBookPages.length) {
+      await displayComicPage(nextPageNum);
     } else {
-      setFinished = true;
+      await saveLastLocation(true); // Mark as finished
     }
-  } else {
-    promise = currentRendition.next();
-  }
+  } else { // EPUB
+    if (!currentRendition) return;
 
-  if (promise) {
-    await promise;
+    let setFinished = false;
+    let atSectionEnd = false;
+    if (currentRendition.location) {
+      const { end } = currentRendition.location;
+      atSectionEnd = (end.displayed.page >= end.displayed.total);
+    }
+
+    let promise;
+    if (atSectionEnd) {
+      const currentSection = currentRendition.manager.views.last().section;
+      const nextSection = currentSection.next();
+      if (nextSection) {
+        promise = currentRendition.display(nextSection.href);
+      } else {
+        setFinished = true;
+      }
+    } else {
+      promise = currentRendition.next();
+    }
+
+    if (promise) {
+      await promise;
+    }
+    await saveLastLocation(setFinished);
   }
-  await saveLastLocation(setFinished);
 }
 
 async function prevPage() {
-  if (!currentRendition) return;
-  await currentRendition.prev();
-  await saveLastLocation();
+  if (currentBookType === 'cbz') {
+    let prevPageNum = currentComicPage - 2; // Assume we came from a 2-page spread
+    if (prevPageNum < 0) prevPageNum = 0;
+
+    // If the previous page is a solo exception, we might only need to go back 1
+    if (soloPageExceptions.includes(prevPageNum)) {
+       prevPageNum = currentComicPage - 1;
+    }
+    // A more robust way is needed, but for now, this is a simple heuristic.
+    // A truly robust solution would require knowing the layout of the previous page.
+    // Let's refine: just go back 1 or 2 pages.
+    let targetPage = currentComicPage - pagesCurrentlyDisplayed;
+    if (currentComicPage > 0 && targetPage < 0) targetPage = 0; // Don't go before the start
+
+    // A simple heuristic to handle jumping back from a solo page to a spread
+    if (pagesCurrentlyDisplayed === 1 && currentComicPage > 0) {
+        targetPage = currentComicPage - 2;
+        if (targetPage < 0) targetPage = 0;
+        if (soloPageExceptions.includes(targetPage + 1)) {
+             targetPage = currentComicPage - 1;
+        }
+    } else {
+        targetPage = currentComicPage - 2;
+        if (targetPage < 0) targetPage = 0;
+    }
+    if (currentComicPage === 1) targetPage = 0;
+
+
+    await displayComicPage(targetPage);
+
+  } else { // EPUB
+    if (!currentRendition) return;
+    await currentRendition.prev();
+    await saveLastLocation();
+  }
 }
 
 async function handleKeyPress(event) {
-  if (document.getElementById('reader-view').style.display !== 'block' || !currentRendition) {
+  if (document.getElementById('reader-view').style.display !== 'block' || (!currentRendition && currentBookType !== 'cbz')) {
     return;
   }
   event.stopPropagation();
@@ -670,22 +817,28 @@ async function handleKeyPress(event) {
       break;
     case '+':
     case '=': // Also handle '=' for keyboards where + is a shift key
-      increaseFontSize();
+      if (currentBookType !== 'cbz') increaseFontSize();
       break;
     case '-':
-      decreaseFontSize();
+      if (currentBookType !== 'cbz') decreaseFontSize();
       break;
     case '[':
-      decreaseLineHeight();
+      if (currentBookType !== 'cbz') decreaseLineHeight();
       break;
     case ']':
-      increaseLineHeight();
+      if (currentBookType !== 'cbz') increaseLineHeight();
       break;
     case '0':
-      resetFontSettings();
+      if (currentBookType !== 'cbz') resetFontSettings();
       break;
     case 'f':
-      toggleFont();
+      if (currentBookType !== 'cbz') toggleFont();
+      break;
+    case 'd':
+      if (currentBookType === 'cbz') toggleDirection();
+      break;
+    case 's':
+      if (currentBookType === 'cbz') toggleSpread();
       break;
   }
 }
@@ -702,7 +855,15 @@ async function handleFileUpload(event) {
       const reader = new FileReader();
       reader.onload = (e) => {
         const bookData = e.target.result;
-        storeBook(file.name, bookData).then(resolve).catch(reject);
+        if (file.name.endsWith('.epub')) {
+          storeBook(file.name, bookData).then(resolve).catch(reject);
+        } else if (file.name.endsWith('.cbz')) {
+          storeComicBook(file.name, bookData).then(resolve).catch(reject);
+        } else {
+          // Optional: handle unsupported file types
+          console.warn(`Unsupported file type: ${file.name}`);
+          resolve(); // Resolve to not block other uploads
+        }
       };
       reader.onerror = (e) => {
         reject(new Error(`Error reading file: ${file.name}`));
@@ -741,7 +902,7 @@ function storeBook(name, data) {
       const booksStore = transaction.objectStore(STORE_BOOKS_NAME);
       const metadataStore = transaction.objectStore(STORE_METADATA_NAME);
 
-      const book = { name, data, coverImage };
+      const book = { name, data, coverImage, type: 'epub' };
       const request = booksStore.add(book);
 
       request.onsuccess = (event) => {
@@ -762,6 +923,51 @@ function storeBook(name, data) {
 
     } catch (error) {
       console.error('Error processing book for storage:', error);
+      reject(error);
+    }
+  });
+}
+
+async function storeComicBook(name, data) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const zip = await JSZip.loadAsync(data);
+      const imageFiles = Object.values(zip.files).filter(file =>
+        !file.dir && /\.(jpe?g|png|gif|webp)$/i.test(file.name)
+      ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+      let coverImage = null;
+      if (imageFiles.length > 0) {
+        const firstImageFile = imageFiles[0];
+        const blob = await firstImageFile.async('blob');
+        coverImage = await resizeImageBlob(blob);
+      }
+
+      const transaction = db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME], 'readwrite');
+      const booksStore = transaction.objectStore(STORE_BOOKS_NAME);
+      const metadataStore = transaction.objectStore(STORE_METADATA_NAME);
+
+      const book = { name, data, coverImage, type: 'cbz' };
+      const request = booksStore.add(book);
+
+      request.onsuccess = (event) => {
+        const bookId = event.target.result;
+        const metadata = { bookId: bookId, state: 'unread', progress: 0 };
+        metadataStore.add(metadata);
+      };
+
+      transaction.oncomplete = () => {
+        console.log('Comic book and metadata stored successfully');
+        resolve();
+      };
+
+      transaction.onerror = (event) => {
+        console.error('Transaction error in storeComicBook:', event.target.error);
+        reject(event.target.error);
+      };
+
+    } catch (error) {
+      console.error('Error processing comic book for storage:', error);
       reject(error);
     }
   });
@@ -1055,10 +1261,216 @@ function openBook(bookId) {
     }
 
     const bookData = bookRecord.data;
-    openRendition(bookData, metadataRecord);
+    currentBookType = bookRecord.type || 'epub'; // Default to epub for older data
+
+    if (currentBookType === 'cbz') {
+      openComicBook(bookData, metadataRecord);
+    } else {
+      openRendition(bookData, metadataRecord);
+    }
   }).catch(error => {
     console.error("Error opening book:", error);
     // Optionally, show an error to the user
+  });
+}
+
+async function openComicBook(bookData, metadata) {
+  soloPageExceptions = (metadata && metadata.soloPageExceptions) ? metadata.soloPageExceptions : [];
+  comicInfoPageLayouts = new Map(); // Clear for new book
+
+  document.getElementById('book-management').style.display = 'none';
+  const readerView = document.getElementById('reader-view');
+  readerView.style.display = 'block';
+  readerView.classList.add('comic-mode'); // Add class to hide epub controls
+
+  window.addEventListener('keydown', handleKeyPress);
+  readerView.addEventListener('mousemove', showControls);
+  showControls();
+
+  document.getElementById('book-title-display').textContent = "Comic Book"; // Placeholder
+
+  const zip = await JSZip.loadAsync(bookData);
+
+  // Look for ComicInfo.xml
+  const comicInfoFile = Object.values(zip.files).find(file => file.name.toLowerCase().endsWith('comicinfo.xml'));
+  let directionFromComicInfo = 'rtl'; // Default
+
+  if (comicInfoFile) {
+    const xmlString = await comicInfoFile.async('string');
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+    const title = xmlDoc.getElementsByTagName('Title')[0]?.textContent;
+    if (title) {
+      document.getElementById('book-title-display').textContent = title;
+    }
+    const direction = xmlDoc.getElementsByTagName('ReadingDirection')[0]?.textContent;
+    if (direction && direction.toLowerCase() !== 'righttoleft') {
+      directionFromComicInfo = 'ltr';
+    }
+
+    // Parse page layout information
+    const pagesElement = xmlDoc.getElementsByTagName('Pages')[0];
+    if (pagesElement) {
+      const pageElements = pagesElement.getElementsByTagName('Page');
+      for (let i = 0; i < pageElements.length; i++) {
+        const pageElement = pageElements[i];
+        const imageAttribute = pageElement.getAttribute('Image');
+        const doublePageAttribute = pageElement.getAttribute('DoublePage');
+
+        if (imageAttribute && doublePageAttribute === 'true') {
+          comicInfoPageLayouts.set(imageAttribute, 'double');
+        }
+      }
+    }
+  }
+
+  // Set direction based on priority: 1. Saved Metadata, 2. ComicInfo, 3. Default
+  if (metadata && metadata.direction) {
+    currentBookDirection = metadata.direction;
+  } else {
+    currentBookDirection = directionFromComicInfo;
+  }
+
+  updateDirectionButton();
+
+
+  comicBookPages = Object.values(zip.files).filter(file =>
+    !file.dir && /\.(jpe?g|png|gif|webp)$/i.test(file.name)
+  ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+  // Now that comicBookPages is populated, resolve filenames to indices for comicInfoPageLayouts
+  const resolvedComicInfoPageLayouts = new Map();
+  comicBookPages.forEach((file, index) => {
+    if (comicInfoPageLayouts.get(file.name)) {
+      resolvedComicInfoPageLayouts.set(index, comicInfoPageLayouts.get(file.name));
+    }
+  });
+  comicInfoPageLayouts = resolvedComicInfoPageLayouts;
+
+  currentComicPage = 0;
+  if (metadata && metadata.lastLocation) {
+    currentComicPage = parseInt(metadata.lastLocation, 10) || 0;
+  }
+
+  displayComicPage(currentComicPage);
+}
+
+async function displayComicPage(pageNumber) {
+  if (pageNumber < 0 || pageNumber >= comicBookPages.length) {
+    return;
+  }
+  currentComicPage = pageNumber;
+  const viewer = document.getElementById('viewer');
+  viewer.innerHTML = ''; // Clear previous content
+  viewer.style.display = 'flex'; // Use flexbox for layout
+
+  const readerView = document.getElementById('reader-view');
+  const spreadToggleButton = document.getElementById('spread-toggle');
+
+  // --- Layout Decision Logic ---
+  const page1File = comicBookPages[pageNumber];
+  const page2File = (pageNumber + 1 < comicBookPages.length) ? comicBookPages[pageNumber + 1] : null;
+
+  const [page1Dims, page2Dims] = await Promise.all([
+    getImageDimensions(page1File),
+    getImageDimensions(page2File)
+  ]);
+
+  const viewerDims = { width: viewer.clientWidth, height: viewer.clientHeight };
+
+  let layout = 'single'; // Default layout
+
+  // 1. Level 1: Manual User Override (Highest Priority)
+  if (soloPageExceptions.includes(pageNumber)) {
+    layout = 'single';
+  } else if (pageNumber === 0 || !page2File) {
+    // Edge cases: Cover page or no next page always single
+    layout = 'single';
+  } else if (comicInfoPageLayouts.get(pageNumber) === 'double') {
+    // 2. Level 2: Explicit Metadata from ComicInfo.xml (Second Priority)
+    layout = 'double';
+  } else if (viewerDims.width > viewerDims.height) { // Only consider two-page layout in landscape
+    // 3. Level 3: Automatic "Wasted Pixel" Calculation (Lowest Priority)
+    // Calculate wasted pixels for single page
+    const scaleSingle = Math.min(viewerDims.width / page1Dims.width, viewerDims.height / page1Dims.height);
+    const areaSingle = (page1Dims.width * scaleSingle) * (page1Dims.height * scaleSingle);
+    const wastedSingle = (viewerDims.width * viewerDims.height) - areaSingle;
+
+    // Calculate wasted pixels for double page
+    const combinedWidth = page1Dims.width + page2Dims.width;
+    const combinedHeight = Math.max(page1Dims.height, page2Dims.height);
+    const scaleDouble = Math.min(viewerDims.width / combinedWidth, viewerDims.height / combinedHeight);
+    const areaDouble = (combinedWidth * scaleDouble) * (combinedHeight * scaleDouble);
+    const wastedDouble = (viewerDims.width * viewerDims.height) - areaDouble;
+
+    if (wastedDouble < wastedSingle) {
+      layout = 'double';
+    }
+  }
+
+  // --- Rendering Logic ---
+  pagesCurrentlyDisplayed = 0;
+  readerView.classList.remove('show-spread-toggle');
+  spreadToggleButton.textContent = 'Split';
+
+  const isSoloException = soloPageExceptions.includes(pageNumber);
+  if (isSoloException) {
+      readerView.classList.add('show-spread-toggle');
+      spreadToggleButton.textContent = 'Rejoin';
+  }
+
+
+  const filesToRender = [];
+  if (layout === 'double') {
+    filesToRender.push(page1File, page2File);
+    pagesCurrentlyDisplayed = 2;
+    readerView.classList.add('show-spread-toggle');
+  } else {
+    filesToRender.push(page1File);
+    pagesCurrentlyDisplayed = 1;
+  }
+
+  const imagePromises = filesToRender.map(file => file.async('blob').then(blob => URL.createObjectURL(blob)));
+  const imageUrls = await Promise.all(imagePromises);
+
+  const fragment = document.createDocumentFragment();
+  imageUrls.forEach(url => {
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.objectFit = 'contain';
+    img.style.maxWidth = `${100 / imageUrls.length}%`;
+    img.style.maxHeight = '100%';
+    img.onload = () => URL.revokeObjectURL(url); // Revoke on load
+    fragment.appendChild(img);
+  });
+
+  if (currentBookDirection === 'rtl') {
+      Array.from(fragment.children).reverse().forEach(child => viewer.appendChild(child));
+  } else {
+      viewer.appendChild(fragment);
+  }
+
+  await saveLastLocation();
+}
+
+function getImageDimensions(pageFile) {
+  return new Promise((resolve, reject) => {
+    if (!pageFile) {
+      return resolve(null);
+    }
+    pageFile.async('blob').then(blob => {
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
+      img.onload = () => {
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => {
+        reject(new Error('Could not load image dimensions'));
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    });
   });
 }
 

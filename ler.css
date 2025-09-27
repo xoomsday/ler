@@ -345,3 +345,25 @@ h1 {
 #next-page-area::after {
   content: '›';
 }
+
+.comic-mode .control-pill,
+.comic-mode #toc-button,
+.comic-mode #bookmark-button {
+  display: none;
+}
+
+#direction-toggle-pill {
+  display: none;
+}
+
+.comic-mode #direction-toggle-pill {
+  display: flex;
+}
+
+#spread-toggle-pill {
+  display: none;
+}
+
+.comic-mode.show-spread-toggle #spread-toggle-pill {
+  display: flex;
+}
