@@ -1,8 +1,8 @@
-# Local Epub Reader (ler)
+# Local Ebook Reader (ler)
 
 ## Goal
 
-The Local Epub Reader (ler) is a minimalist Progressive Web App (PWA)
+The Local Ebook Reader (ler) is a minimalist Progressive Web App (PWA)
 designed for a simple, offline-first, and privacy-focused reading
 experience. It allows users to upload and read their EPUB and CBZ
 books directly in the browser without needing any server-side
@@ -118,7 +118,7 @@ the browser's IndexedDB.
     server (even a local one) for the Service Worker and other features
     to work correctly. A simple server can be run with `python3 -m
     http.server` or a similar tool.
-2.  **Open the Application**: Navigate to `LocalEpubReader.html` in your
+2.  **Open the Application**: Navigate to `LocalEbookReader.html` in your
     browser.
 3.  **Upload a Book**: Click the `+` button in the top pane and select
     one or more `.epub` or `.cbz` files. They will appear in the book

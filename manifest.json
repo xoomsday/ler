@@ -1,10 +1,10 @@
 {
-  "name": "Local ePUB Reader",
+  "name": "Local Ebook Reader",
   "short_name": "LER",
-  "start_url": "LocalEpubReader.html",
+  "start_url": "LocalEbookReader.html",
   "display": "standalone",
   "background_color": "#fff",
-  "description": "A simple PWA for reading local ePUB files.",
+  "description": "A simple PWA for reading local EPUB and CBZ files.",
   "icons": [
     {
       "src": "LER.svg",

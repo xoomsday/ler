@@ -3,7 +3,7 @@ self.addEventListener('install', (e) => {
     caches.open('ler-store').then((cache) => {
       return cache.addAll([
         './',
-        './LocalEpubReader.html',
+        './LocalEbookReader.html',
         './ler.css',
         './ler-dark.css',
         './ler.js',
