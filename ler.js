@@ -197,6 +197,12 @@ window.addEventListener('load', async () => {
 
   const sortBy = document.getElementById('sort-by');
   sortBy.addEventListener('change', displayBooks);
+
+  const helpOverlay = document.getElementById('help-overlay');
+  const helpClose = document.getElementById('help-close');
+  helpClose.addEventListener('click', () => {
+    helpOverlay.style.display = 'none';
+  });
 });
 
 async function closeReader() {
@@ -213,6 +219,7 @@ async function closeReader() {
   document.getElementById('reader-view').style.display = 'none';
   document.getElementById('viewer').innerHTML = '';
   document.getElementById('book-management').style.display = 'block';
+  document.getElementById('help-overlay').style.display = 'none';
 
   // Reset comic book specific things
   readerView.classList.remove('comic-mode');
@@ -502,6 +509,7 @@ function toggleOverlay(type) {
     clearTimeout(controlsTimer);
     controls.classList.remove('controls-hidden');
 
+    document.getElementById('help-overlay').style.display = 'none';
     tocOverlay.style.display = 'block';
     tocOverlay.dataset.content = type;
     if (type === 'toc') {
@@ -839,6 +847,14 @@ async function handleKeyPress(event) {
       break;
     case 's':
       if (currentBookType === 'cbz') toggleSpread();
+      break;
+    case '?':
+      const helpOverlay = document.getElementById('help-overlay');
+      if (helpOverlay.style.display === 'none') {
+        helpOverlay.style.display = 'block';
+      } else {
+        helpOverlay.style.display = 'none';
+      }
       break;
   }
 }

@@ -89,9 +89,13 @@ the browser's IndexedDB.
         *   **Intuitive Display Controls**: Font size, line height, and
           font face are managed with "pill" shaped controls that always
           show the current value.
+        *   **On-Demand Help**: A help screen showing all keyboard
+          shortcuts can be brought up at any time by pressing the `?`
+          key.
     *   **Keyboard Navigation**:
         *   **For All Views**:
             *   `ArrowLeft` / `ArrowRight`: Navigate between pages.
+            *   `?`: Show or hide the keyboard shortcuts help screen.
         *   **For EPUB Reader**:
             *   `+` / `-`: Increase or decrease the font size.
             *   `[` / `]`: Increase or decrease the line spacing.

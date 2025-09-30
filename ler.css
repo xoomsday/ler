@@ -366,3 +366,21 @@ h1 {
 .comic-mode.show-spread-toggle #spread-toggle-pill {
   display: flex;
 }
+
+#help-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 2em;
+  z-index: 100;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+#help-close {
+  text-align: center;
+  cursor: pointer;
+  margin-top: 2em;
+}
