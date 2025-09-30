@@ -215,25 +215,24 @@ h1 {
 .control-pill {
   display: flex;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: #efefef;
+  border: 1px solid #ccc;
   border-radius: 15px;
   padding: 2px;
 }
 
 .control-pill button {
   border: none;
-  background: #ccc;
+  background: transparent;
   color: #333;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
   font-size: 1.2em;
   line-height: 1;
   cursor: pointer;
+  padding: 0.2em 0.6em;
 }
 
 .control-pill button:hover {
-  background: #bbb;
+  background: #ddd;
 }
 
 .control-pill span {
