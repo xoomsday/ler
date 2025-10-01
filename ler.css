@@ -281,6 +281,12 @@ h1 {
   height: 100%;
 }
 
+.comic-mode #viewer {
+  display: flex;
+  justify-content: center; /* Center horizontally */
+  align-items: center;   /* Center vertically */
+}
+
 #toc-overlay {
   position: absolute;
   top: 0;
