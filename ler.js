@@ -802,51 +802,39 @@ async function prevPage() {
   }
 }
 
-async function handleKeyPress(event) {
-  if (document.getElementById('reader-view').style.display !== 'block' || (!currentRendition && currentBookType !== 'cbz')) {
-    return;
-  }
-  event.stopPropagation();
-
+async function handleEpubKeyPress(event) {
   switch (event.key) {
-    case 'ArrowLeft':
-      if (currentBookDirection === 'rtl') {
-        nextPage();
-      } else {
-        prevPage();
-      }
-      break;
-    case 'ArrowRight':
-      if (currentBookDirection === 'rtl') {
-        prevPage();
-      } else {
-        nextPage();
-      }
-      break;
-    case '+':
-    case '=': // Also handle '=' for keyboards where + is a shift key
-      if (currentBookType !== 'cbz') increaseFontSize();
-      break;
+    case 'ArrowUp':
     case '-':
-      if (currentBookType !== 'cbz') decreaseFontSize();
+    case '_':
+      decreaseFontSize();
+      break;
+    case 'ArrowDown':
+    case '+':
+    case '=':
+      increaseFontSize();
       break;
     case '[':
-      if (currentBookType !== 'cbz') decreaseLineHeight();
+      decreaseLineHeight();
       break;
     case ']':
-      if (currentBookType !== 'cbz') increaseLineHeight();
+      increaseLineHeight();
       break;
     case '0':
-      if (currentBookType !== 'cbz') resetFontSettings();
+      resetFontSettings();
       break;
     case 'f':
-      if (currentBookType !== 'cbz') toggleFont();
+    case 's':
+      toggleFont();
       break;
     case 'd':
-      if (currentBookType === 'cbz') toggleDirection();
+      toggleDarkMode();
       break;
-    case 's':
-      if (currentBookType === 'cbz') toggleSpread();
+    case 'm':
+      toggleToc();
+      break;
+    case 'b':
+      addNewBookmark();
       break;
     case '?':
       const helpOverlay = document.getElementById('help-overlay');
@@ -856,6 +844,57 @@ async function handleKeyPress(event) {
         helpOverlay.style.display = 'none';
       }
       break;
+  }
+}
+
+async function handleCbzKeyPress(event) {
+  switch (event.key) {
+    case 'd':
+      toggleDirection();
+      break;
+    case 's':
+      toggleSpread();
+      break;
+    case '?':
+      const helpOverlay = document.getElementById('help-overlay');
+      if (helpOverlay.style.display === 'none') {
+        helpOverlay.style.display = 'block';
+      } else {
+        helpOverlay.style.display = 'none';
+      }
+      break;
+  }
+}
+
+async function handleKeyPress(event) {
+  if (document.getElementById('reader-view').style.display !== 'block' || (!currentRendition && currentBookType !== 'cbz')) {
+    return;
+  }
+  event.stopPropagation();
+
+  // Handle shared keys first
+  switch (event.key) {
+    case 'ArrowLeft':
+      if (currentBookDirection === 'rtl') {
+        nextPage();
+      } else {
+        prevPage();
+      }
+      return; // Consume event
+    case 'ArrowRight':
+      if (currentBookDirection === 'rtl') {
+        prevPage();
+      } else {
+        nextPage();
+      }
+      return; // Consume event
+  }
+
+  // Delegate to mode-specific handlers
+  if (currentBookType === 'cbz') {
+    await handleCbzKeyPress(event);
+  } else {
+    await handleEpubKeyPress(event);
   }
 }
 
