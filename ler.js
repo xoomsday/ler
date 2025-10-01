@@ -1364,7 +1364,7 @@ function openBook(bookId) {
     currentBookType = bookRecord.type || 'epub'; // Default to epub for older data
 
     if (currentBookType === 'cbz') {
-      openComicBook(bookData, metadataRecord);
+      openComicBook(bookRecord, metadataRecord);
     } else {
       openRendition(bookData, metadataRecord);
     }
@@ -1374,7 +1374,7 @@ function openBook(bookId) {
   });
 }
 
-async function openComicBook(bookData, metadata) {
+async function openComicBook(bookRecord, metadata) {
   soloPageExceptions = (metadata && metadata.soloPageExceptions) ? metadata.soloPageExceptions : [];
   comicInfoPageLayouts = new Map(); // Clear for new book
 
@@ -1387,9 +1387,10 @@ async function openComicBook(bookData, metadata) {
   readerView.addEventListener('mousemove', showControls);
   showControls();
 
-  document.getElementById('book-title-display').textContent = "Comic Book"; // Placeholder
+  let title = bookRecord.name || ''; // Default to an empty string if name is null/undefined
+  document.getElementById('book-title-display').textContent = title.replace(/\.(cbz|epub)$/i, ''); // Use filename as default, remove extension
 
-  const zip = await JSZip.loadAsync(bookData);
+  const zip = await JSZip.loadAsync(bookRecord.data);
 
   // Look for ComicInfo.xml
   const comicInfoFile = Object.values(zip.files).find(file => file.name.toLowerCase().endsWith('comicinfo.xml'));
