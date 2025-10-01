@@ -1099,6 +1099,36 @@ function deleteBook(bookId) {
   };
 }
 
+async function downloadBook(bookId) {
+  try {
+    const book = await getFromDB(STORE_BOOKS_NAME, bookId);
+    if (!book || !book.data) {
+      console.error('Book data not found for ID:', bookId);
+      alert('Could not find book data to download.');
+      return;
+    }
+
+    const blob = new Blob([book.data], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = book.name;
+    document.body.appendChild(a);
+    a.click();
+
+    // Cleanup
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+
+  } catch (error) {
+    console.error('Error downloading book:', error);
+    alert('An error occurred while trying to download the book.');
+  }
+}
+
 function updateBookState(bookId, state) {
   const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
   const store = transaction.objectStore(STORE_METADATA_NAME);
@@ -1214,6 +1244,11 @@ function displayBooks() {
         deleteLink.textContent = 'Delete';
         menuContent.appendChild(deleteLink);
 
+        const downloadLink = document.createElement('a');
+        downloadLink.href = '#';
+        downloadLink.textContent = 'Download';
+        menuContent.appendChild(downloadLink);
+
         const resetMenu = document.createElement('div');
         resetMenu.innerHTML = '<hr><span>Reset State:</span>';
         menuContent.appendChild(resetMenu);
@@ -1245,6 +1280,13 @@ function displayBooks() {
           if (confirm(`Are you sure you want to delete "${book.name}"?`)) {
             deleteBook(book.id);
           }
+        });
+
+        downloadLink.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          downloadBook(book.id);
+          menuContent.classList.remove('show-menu');
         });
 
         bookGrid.appendChild(tile);
