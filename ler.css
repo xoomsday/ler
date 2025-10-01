@@ -368,6 +368,10 @@ h1 {
   display: none;
 }
 
+.comic-mode #dark-mode-pill {
+  display: flex;
+}
+
 #direction-toggle-pill {
   display: none;
 }
