@@ -197,12 +197,6 @@ window.addEventListener('load', async () => {
 
   const sortBy = document.getElementById('sort-by');
   sortBy.addEventListener('change', displayBooks);
-
-  const helpOverlay = document.getElementById('help-overlay');
-  const helpClose = document.getElementById('help-close');
-  helpClose.addEventListener('click', () => {
-    helpOverlay.style.display = 'none';
-  });
 });
 
 async function closeReader() {
@@ -807,12 +801,12 @@ async function prevPage() {
 
 async function handleEpubKeyPress(event) {
   switch (event.key) {
-    case 'ArrowUp':
+    case 'ArrowDown':
     case '-':
     case '_':
       decreaseFontSize();
       break;
-    case 'ArrowDown':
+    case 'ArrowUp':
     case '+':
     case '=':
       increaseFontSize();
@@ -842,6 +836,7 @@ async function handleEpubKeyPress(event) {
     case '?':
       const helpOverlay = document.getElementById('help-overlay');
       if (helpOverlay.style.display === 'none') {
+        generateHelpContent(currentBookType);
         helpOverlay.style.display = 'block';
       } else {
         helpOverlay.style.display = 'none';
@@ -861,12 +856,47 @@ async function handleCbzKeyPress(event) {
     case '?':
       const helpOverlay = document.getElementById('help-overlay');
       if (helpOverlay.style.display === 'none') {
+        generateHelpContent(currentBookType);
         helpOverlay.style.display = 'block';
       } else {
         helpOverlay.style.display = 'none';
       }
       break;
   }
+}
+
+function generateHelpContent(bookType) {
+  const contentDiv = document.getElementById('help-content');
+  contentDiv.innerHTML = ''; // Clear existing content
+
+  let shortcuts = [];
+  if (bookType === 'cbz') {
+    shortcuts = [
+      { key: '←', description: 'Previous page' },
+      { key: '→', description: 'Next page' },
+      { key: 'd', description: 'Toggle reading direction (LTR/RTL)' },
+      { key: 's', description: 'Toggle split/rejoin for current page' },
+      { key: '?', description: 'Show/hide this help' }
+    ];
+  } else { // epub
+    shortcuts = [
+      { key: '←', description: 'Previous page' },
+      { key: '→', description: 'Next page' },
+      { key: '↑', description: 'Increase font size' },
+      { key: '↓', description: 'Decrease font size' },
+      { key: 's', description: 'Toggle font (serif/sans-serif)' },
+      { key: 'd', description: 'Toggle dark mode' },
+      { key: 'm', description: 'Toggle TOC/Bookmark' },
+      { key: 'b', description: 'Add/remove bookmark' },
+      { key: '?', description: 'Show/hide this help' }
+    ];
+  }
+
+  shortcuts.forEach(shortcut => {
+    const p = document.createElement('p');
+    p.innerHTML = `<b>${shortcut.key}</b>: ${shortcut.description}`;
+    contentDiv.appendChild(p);
+  });
 }
 
 async function handleKeyPress(event) {
