@@ -409,11 +409,14 @@ async function toggleFont() {
 async function applyFont() {
   if (!currentRendition) return;
   const fontToggleButton = document.getElementById('font-toggle');
+  const serifFonts = '"MS PMincho", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "serif-ja", serif';
+  const sansFonts = '"Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", "sans-serif-ja", sans-serif';
+
   if (currentFont === 'serif') {
-    currentRendition.themes.select('serif');
+    currentRendition.themes.override('font-family', serifFonts);
     fontToggleButton.classList.add('serif');
   } else {
-    currentRendition.themes.select('sans');
+    currentRendition.themes.override('font-family', sansFonts);
     fontToggleButton.classList.remove('serif');
   }
 }
@@ -1585,11 +1588,6 @@ function openRendition(bookData, metadata) {
     currentBookDirection = currentBook.packaging.metadata.direction || 'ltr';
 
     currentRendition = currentBook.renderTo('viewer', { width: '100%', height: '100%' });
-
-    currentRendition.themes.register({
-      serif: { 'body': { 'font-family': '"MS PMincho", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "serif-ja", serif !important' } },
-      sans: { 'body': { 'font-family': '"Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", "sans-serif-ja", sans-serif !important' } }
-    });
 
     currentRendition.on('rendered', () => {
       const view = currentRendition.manager.views.last();
