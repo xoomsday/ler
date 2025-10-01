@@ -219,6 +219,17 @@ h1 {
   border: 1px solid #ccc;
   border-radius: 15px;
   padding: 2px;
+  overflow: hidden; /* Clip content that overflows the rounded corners */
+}
+
+.control-pill button:first-child {
+  border-top-left-radius: 13px; /* Slightly less than container to account for padding */
+  border-bottom-left-radius: 13px;
+}
+
+.control-pill button:last-child {
+  border-top-right-radius: 13px; /* Slightly less than container to account for padding */
+  border-bottom-right-radius: 13px;
 }
 
 .control-pill button {
