@@ -18,14 +18,20 @@ the browser's IndexedDB.
 *   **EPUB and CBZ Support**: Read both standard e-books and comic book
     archives.
 *   **Advanced Comic Reader View**:
-    *   **Automatic Facing-Page View**: To maximize screen real estate,
-      the reader automatically displays one or two pages at a time based
-      on the window's aspect ratio and the pages' dimensions,
-      minimizing wasted space.
+    *   **Dynamic Page Scaling**: To maximize screen real estate, the
+      reader uses a JavaScript-based calculation to display one or two
+      pages at a time. It analyzes the window's aspect ratio and the
+      pages' dimensions to scale the content to fit the screen
+      perfectly, minimizing wasted space. This calculation is re-run
+      automatically whenever the window is resized.
     *   **Manual Spread Control**: A "Split/Rejoin" button (and the `s`
       keyboard shortcut) allows you to manually override the automatic
       layout, forcing a two-page spread to display as single pages or
       rejoining pages you previously split.
+    *   **Intelligent Title Display**: The reader displays the book's
+      title from its internal `ComicInfo.xml` file. If no title is
+      found, it intelligently falls back to using the book's original
+      filename (with the file extension removed).
 *   **ComicInfo.xml Parsing**: For CBZ files, the application will parse
     an embedded `ComicInfo.xml` file to automatically set the correct
     reading direction (Left-to-Right or Right-to-Left) and to respect
@@ -55,6 +61,7 @@ the browser's IndexedDB.
           or by the last time they were read.
     *   **Book Actions**: A hamburger menu on each tile allows you to:
         *   **Delete** the book from your library.
+        *   **Download** the book file (EPUB or CBZ) to your device.
         *   **Reset the state** manually to Unread, Reading, or
           Finished.
     *   **Local Storage**: Book files and user metadata are stored
@@ -69,9 +76,10 @@ the browser's IndexedDB.
         *   **For Comics**: The user's preferred reading direction and
           any manual spread overrides ("splits") are saved for each
           comic individually.
-    *   **Dark Mode**: A simple toggle allows switching the entire
-      application, including the book content, to a dark theme for
-      comfortable night reading. The setting is saved globally.
+    *   **Dark Mode**: A simple toggle, available in both the EPUB and
+      CBZ reader views, allows switching the entire application to a
+      dark theme for comfortable night reading. The setting is saved
+      globally.
     *   **EPUB Rendering**: Opens and displays EPUB files using the
       `epub.js` library.
     *   **Table of Contents (TOC) & Bookmarking**: A unified overlay
@@ -89,19 +97,22 @@ the browser's IndexedDB.
         *   **Intuitive Display Controls**: Font size, line height, and
           font face are managed with "pill" shaped controls that always
           show the current value.
-        *   **On-Demand Help**: A help screen showing all keyboard
-          shortcuts can be brought up at any time by pressing the `?`
-          key.
+        *   **Dynamic Help**: A help screen showing keyboard shortcuts
+          can be brought up at any time by pressing the `?` key. The
+          content of this screen is context-aware, showing only the
+          shortcuts relevant to the current view (EPUB or CBZ).
     *   **Keyboard Navigation**:
         *   **For All Views**:
             *   `ArrowLeft` / `ArrowRight`: Navigate between pages.
             *   `?`: Show or hide the keyboard shortcuts help screen.
         *   **For EPUB Reader**:
-            *   `+` / `-`: Increase or decrease the font size.
+            *   `ArrowUp` / `+` / `=`: Increase the font size.
+            *   `ArrowDown` / `-` / `_`: Decrease the font size.
             *   `[` / `]`: Increase or decrease the line spacing.
-            *   `f`: Toggle between serif and sans-serif fonts.
-            *   `0`: Reset font size, line height, and font face to
-              default.
+            *   `s`: Toggle font (**s**erif/sans-serif).
+            *   `d`: Toggle **d**ark mode.
+            *   `m`: Toggle TOC/**m**enu overlay.
+            *   `b`: Add **b**ookmark at current location.
         *   **For Comic Reader**:
             *   `d`: Toggle reading **d**irection (LTR/RTL).
             *   `s`: **S**plit a two-page spread into single pages, or
