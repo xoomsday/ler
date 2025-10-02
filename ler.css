@@ -364,7 +364,8 @@ h1 {
 
 .comic-mode .control-pill,
 .comic-mode #toc-button,
-.comic-mode #bookmark-button {
+.comic-mode #bookmark-button,
+.comic-mode #tts-pill {
   display: none;
 }
 

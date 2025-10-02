@@ -12,6 +12,7 @@ let currentRendition;
 let currentBookId = null;
 let currentBookType = null;
 let currentBookDirection = 'ltr';
+let currentBookLanguage = 'en-US'; // Default language for TTS
 let currentFontSize = 100;
 let currentLineHeight = 1.5;
 let currentFont = 'sans-serif';
@@ -24,6 +25,9 @@ let currentComicPage = 0;
 let pagesCurrentlyDisplayed = 1;
 let soloPageExceptions = [];
 let comicInfoPageLayouts = new Map();
+let synth = window.speechSynthesis;
+let currentUtterance = null;
+let isAutoReading = false;
 
 function showControls() {
   const controls = document.getElementById('reader-controls');
@@ -56,6 +60,86 @@ function addMouseHandlers(element) {
 function removeMouseHandlers(element) {
   element.removeEventListener('mousemove', showControls);
   element.removeEventListener('click', showControls);
+}
+
+async function readCurrentPage() {
+  if (!currentRendition || !isAutoReading) return;
+
+  const view = currentRendition.manager.views.last();
+  if (!view || !view.iframe) return;
+
+  const text = view.iframe.contentWindow.document.body.textContent;
+  if (!text || text.trim() === '') {
+    // If page is blank, just go to the next one
+    if (isAutoReading) {
+      await nextEpubPage();
+      readCurrentPage();
+    }
+    return;
+  }
+
+  console.log('lang: ', currentBookLanguage);
+
+  currentUtterance = new SpeechSynthesisUtterance(text);
+  currentUtterance.lang = currentBookLanguage; // Set the language for the utterance
+  currentUtterance.onend = async () => {
+    if (isAutoReading) {
+      await nextEpubPage();
+      // A small delay to allow the next page to render before reading
+      setTimeout(readCurrentPage, 250);
+    }
+  };
+  currentUtterance.onerror = (event) => {
+    console.error('SpeechSynthesisUtterance.onerror', event);
+    // Stop auto-reading on error
+    stopReading();
+  };
+
+  synth.speak(currentUtterance);
+}
+
+function togglePlayPause() {
+  if (!synth) {
+    alert('Text-to-Speech is not supported in this browser.');
+    return;
+  }
+
+  const playButton = document.getElementById('tts-play');
+  const pauseButton = document.getElementById('tts-pause');
+
+  if (synth.paused) { // It's paused, so resume
+    synth.resume();
+    playButton.style.display = 'none';
+    pauseButton.style.display = 'inline-block';
+  } else if (synth.speaking) { // It's speaking, so pause
+    synth.pause();
+    playButton.style.display = 'inline-block';
+    pauseButton.style.display = 'none';
+  } else { // It's not started, so play
+    startReading();
+  }
+}
+
+function startReading() {
+  if (!synth) return;
+  isAutoReading = true;
+  readCurrentPage();
+
+  document.getElementById('tts-play').style.display = 'none';
+  document.getElementById('tts-pause').style.display = 'inline-block';
+  document.getElementById('tts-stop').style.display = 'inline-block';
+}
+
+function stopReading() {
+  isAutoReading = false;
+  if (synth) {
+    synth.cancel();
+  }
+  currentUtterance = null;
+
+  document.getElementById('tts-play').style.display = 'inline-block';
+  document.getElementById('tts-pause').style.display = 'none';
+  document.getElementById('tts-stop').style.display = 'none';
 }
 
 function initDB() {
@@ -164,6 +248,10 @@ window.addEventListener('load', async () => {
   document.getElementById('direction-toggle').addEventListener('click', toggleDirection);
   document.getElementById('spread-toggle').addEventListener('click', toggleSpread);
 
+  document.getElementById('tts-play').addEventListener('click', togglePlayPause);
+  document.getElementById('tts-pause').addEventListener('click', togglePlayPause);
+  document.getElementById('tts-stop').addEventListener('click', stopReading);
+
   window.addEventListener('resize', () => {
     if (currentBookType === 'cbz' && document.getElementById('reader-view').style.display === 'block') {
       displayComicPage(currentComicPage);
@@ -203,6 +291,7 @@ async function closeReader() {
   if (isClosing) return; // Prevent re-entrancy
   isClosing = true;
 
+  stopReading(); // Stop any active TTS
   await saveLastLocation();
 
   const readerView = document.getElementById('reader-view');
@@ -1678,6 +1767,7 @@ function openRendition(bookData, metadata) {
 
   currentBook.loaded.metadata.then(meta => {
     document.getElementById('book-title-display').textContent = meta.title;
+    currentBookLanguage = meta.language || 'en-US'; // Store the book's language
   });
 
   currentBook.ready.then(async () => {
