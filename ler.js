@@ -62,13 +62,29 @@ function removeMouseHandlers(element) {
   element.removeEventListener('click', showControls);
 }
 
+function extractReadableText(bodyElement) {
+  const clonedBody = bodyElement.cloneNode(true);
+  const rubies = clonedBody.querySelectorAll('ruby');
+  rubies.forEach(ruby => {
+    const rts = ruby.querySelectorAll('rt');
+    let pronunciation = '';
+    rts.forEach(rt => {
+      pronunciation += rt.textContent;
+    });
+    // Replace the ruby element with a text node containing the pronunciation
+    if (pronunciation) {
+      ruby.parentNode
+      .replaceChild(bodyElement.ownerDocument.createTextNode(pronunciation), ruby);
+    }  });
+  return clonedBody.textContent;
+}
+
 async function readCurrentPage() {
   if (!currentRendition || !isAutoReading) return;
-
   const view = currentRendition.manager.views.last();
   if (!view || !view.iframe) return;
-
-  const text = view.iframe.contentWindow.document.body.textContent;
+  const body = view.iframe.contentWindow.document.body;
+  const text = extractReadableText(body);
   if (!text || text.trim() === '') {
     // If page is blank, just go to the next one
     if (isAutoReading) {
