@@ -638,7 +638,7 @@ async function gotoCFI(cfi) {
 
     if (comparison > 0) {
       // The target CFI is still ahead of us. Go to the next page and wait.
-      await nextPage();
+      await nextEpubPage();
     } else {
       // We have arrived at or moved just past the target CFI. Stop.
       return;
@@ -723,93 +723,102 @@ async function deleteBookmark(bookmarkId) {
   });
 }
 
+async function nextEpubPage() {
+  if (!currentRendition) return;
+
+  let setFinished = false;
+  let atSectionEnd = false;
+  if (currentRendition.location) {
+    const { end } = currentRendition.location;
+    atSectionEnd = (end.displayed.page >= end.displayed.total);
+  }
+
+  let promise;
+  if (atSectionEnd) {
+    const currentSection = currentRendition.manager.views.last().section;
+    const nextSection = currentSection.next();
+    if (nextSection) {
+      promise = currentRendition.display(nextSection.href);
+    } else {
+      setFinished = true;
+    }
+  } else {
+    promise = currentRendition.next();
+  }
+
+  if (promise) {
+    await promise;
+  }
+  await saveLastLocation(setFinished);
+}
+
+async function prevEpubPage() {
+  if (!currentRendition) return;
+  await currentRendition.prev();
+  await saveLastLocation();
+}
+
+async function nextCbzPage() {
+  const nextPageNum = currentComicPage + pagesCurrentlyDisplayed;
+  if (nextPageNum < comicBookPages.length) {
+    await displayComicPage(nextPageNum);
+  } else {
+    await saveLastLocation(true); // Mark as finished
+  }
+}
+
+async function prevCbzPage() {
+  let targetPage = currentComicPage - pagesCurrentlyDisplayed;
+  if (currentComicPage > 0 && targetPage < 0) targetPage = 0;
+
+  if (pagesCurrentlyDisplayed === 1 && currentComicPage > 0) {
+    targetPage = currentComicPage - 2;
+    if (targetPage < 0) targetPage = 0;
+    if (soloPageExceptions.includes(targetPage + 1)) {
+      targetPage = currentComicPage - 1;
+    }
+  } else {
+    targetPage = currentComicPage - 2;
+    if (targetPage < 0) targetPage = 0;
+  }
+  if (currentComicPage === 1) targetPage = 0;
+
+  await displayComicPage(targetPage);
+}
+
 async function nextPage() {
   if (currentBookType === 'cbz') {
-    const nextPageNum = currentComicPage + pagesCurrentlyDisplayed;
-    if (nextPageNum < comicBookPages.length) {
-      await displayComicPage(nextPageNum);
-    } else {
-      await saveLastLocation(true); // Mark as finished
-    }
-  } else { // EPUB
-    if (!currentRendition) return;
-
-    let setFinished = false;
-    let atSectionEnd = false;
-    if (currentRendition.location) {
-      const { end } = currentRendition.location;
-      atSectionEnd = (end.displayed.page >= end.displayed.total);
-    }
-
-    let promise;
-    if (atSectionEnd) {
-      const currentSection = currentRendition.manager.views.last().section;
-      const nextSection = currentSection.next();
-      if (nextSection) {
-        promise = currentRendition.display(nextSection.href);
-      } else {
-        setFinished = true;
-      }
-    } else {
-      promise = currentRendition.next();
-    }
-
-    if (promise) {
-      await promise;
-    }
-    await saveLastLocation(setFinished);
+    await nextCbzPage();
+  } else {
+    await nextEpubPage();
   }
 }
 
 async function prevPage() {
   if (currentBookType === 'cbz') {
-    let prevPageNum = currentComicPage - 2; // Assume we came from a 2-page spread
-    if (prevPageNum < 0) prevPageNum = 0;
-
-    // If the previous page is a solo exception, we might only need to go back 1
-    if (soloPageExceptions.includes(prevPageNum)) {
-       prevPageNum = currentComicPage - 1;
-    }
-    // A more robust way is needed, but for now, this is a simple heuristic.
-    // A truly robust solution would require knowing the layout of the previous page.
-    // Let's refine: just go back 1 or 2 pages.
-    let targetPage = currentComicPage - pagesCurrentlyDisplayed;
-    if (currentComicPage > 0 && targetPage < 0) targetPage = 0; // Don't go before the start
-
-    // A simple heuristic to handle jumping back from a solo page to a spread
-    if (pagesCurrentlyDisplayed === 1 && currentComicPage > 0) {
-        targetPage = currentComicPage - 2;
-        if (targetPage < 0) targetPage = 0;
-        if (soloPageExceptions.includes(targetPage + 1)) {
-             targetPage = currentComicPage - 1;
-        }
-    } else {
-        targetPage = currentComicPage - 2;
-        if (targetPage < 0) targetPage = 0;
-    }
-    if (currentComicPage === 1) targetPage = 0;
-
-
-    await displayComicPage(targetPage);
-
-  } else { // EPUB
-    if (!currentRendition) return;
-    await currentRendition.prev();
-    await saveLastLocation();
+    await prevCbzPage();
+  } else {
+    await prevEpubPage();
   }
 }
 
 async function handleEpubKeyPress(event) {
   switch (event.key) {
-    case 'ArrowDown':
-    case '-':
-    case '_':
-      decreaseFontSize();
+    case 'ArrowLeft':
+      if (currentBookDirection === 'rtl') nextEpubPage(); else prevEpubPage();
+      break;
+    case 'ArrowRight':
+      if (currentBookDirection === 'rtl') prevEpubPage(); else nextEpubPage();
       break;
     case 'ArrowUp':
     case '+':
     case '=':
       increaseFontSize();
+      break;
+    case 'ArrowDown':
+    case '-':
+    case '_':
+      decreaseFontSize();
       break;
     case '[':
       decreaseLineHeight();
@@ -847,6 +856,12 @@ async function handleEpubKeyPress(event) {
 
 async function handleCbzKeyPress(event) {
   switch (event.key) {
+    case 'ArrowLeft':
+      if (currentBookDirection === 'rtl') nextCbzPage(); else prevCbzPage();
+      break;
+    case 'ArrowRight':
+      if (currentBookDirection === 'rtl') prevCbzPage(); else nextCbzPage();
+      break;
     case 'd':
       toggleDirection();
       break;
@@ -904,24 +919,6 @@ async function handleKeyPress(event) {
     return;
   }
   event.stopPropagation();
-
-  // Handle shared keys first
-  switch (event.key) {
-    case 'ArrowLeft':
-      if (currentBookDirection === 'rtl') {
-        nextPage();
-      } else {
-        prevPage();
-      }
-      return; // Consume event
-    case 'ArrowRight':
-      if (currentBookDirection === 'rtl') {
-        prevPage();
-      } else {
-        nextPage();
-      }
-      return; // Consume event
-  }
 
   // Delegate to mode-specific handlers
   if (currentBookType === 'cbz') {
