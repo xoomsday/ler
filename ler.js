@@ -1565,15 +1565,42 @@ async function displayComicPage(pageNumber) {
   const imageUrls = await Promise.all(imagePromises);
 
   const fragment = document.createDocumentFragment();
+  const imageElements = [];
   imageUrls.forEach(url => {
     const img = document.createElement('img');
     img.src = url;
     img.style.objectFit = 'contain';
-    img.style.maxWidth = `${100 / imageUrls.length}%`;
-    img.style.maxHeight = '100%';
+    img.style.maxHeight = '100%'; // Keep this to handle edge cases
     img.onload = () => URL.revokeObjectURL(url); // Revoke on load
     fragment.appendChild(img);
+    imageElements.push(img);
   });
+
+  // --- New Scaling Logic ---
+  // Get dimensions of all images that will be rendered
+  const allDims = await Promise.all(imageElements.map(img => new Promise(resolve => {
+    if (img.complete) {
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    } else {
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    }
+  })));
+
+  // Calculate the total dimensions of the spread
+  const totalWidth = allDims.reduce((sum, dim) => sum + dim.width, 0);
+  const maxHeight = Math.max(...allDims.map(dim => dim.height));
+
+  // Calculate the scale factor to fit the spread in the viewer
+  const viewerWidth = viewer.clientWidth;
+  const viewerHeight = viewer.clientHeight;
+  const scale = Math.min(viewerWidth / totalWidth, viewerHeight / maxHeight);
+
+  // Apply the calculated dimensions to each image
+  allDims.forEach((dim, index) => {
+    imageElements[index].style.width = `${dim.width * scale}px`;
+    imageElements[index].style.height = `${dim.height * scale}px`;
+  });
+
 
   if (currentBookDirection === 'rtl') {
       Array.from(fragment.children).reverse().forEach(child => viewer.appendChild(child));
