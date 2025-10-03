@@ -79,12 +79,71 @@ function extractReadableText(bodyElement) {
   return clonedBody.textContent;
 }
 
+async function getCurrentPageText() {
+  if (!currentRendition) {
+    return '';
+  }
+  const location = currentRendition.currentLocation();
+  if (!location || !location.start || !location.end) {
+    return '';
+  }
+
+  const startCfi = location.start.cfi;
+  const endCfi = location.end.cfi;
+
+  try {
+    const startRange = await currentBook.getRange(startCfi);
+    const endRange = await currentBook.getRange(endCfi);
+
+    // Check if the ranges are in the same document
+    if (startRange.startContainer.ownerDocument !== endRange.endContainer.ownerDocument) {
+      // This can happen in spread mode where two different chapter files are displayed.
+      // We need to handle this by creating two ranges and combining their text.
+      const doc1 = startRange.startContainer.ownerDocument;
+      const range1 = doc1.createRange();
+      range1.setStart(startRange.startContainer, startRange.startOffset);
+      range1.setEnd(doc1.body, doc1.body.childNodes.length); // Go to the end of the first document
+      const fragment1 = range1.cloneContents();
+      const div1 = document.createElement('div');
+      div1.appendChild(fragment1);
+      const text1 = extractReadableText(div1);
+
+      const doc2 = endRange.endContainer.ownerDocument;
+      const range2 = doc2.createRange();
+      range2.setStart(doc2.body, 0); // Start from the beginning of the second document
+      range2.setEnd(endRange.endContainer, endRange.endOffset);
+      const fragment2 = range2.cloneContents();
+      const div2 = document.createElement('div');
+      div2.appendChild(fragment2);
+      const text2 = extractReadableText(div2);
+
+      return text1 + " " + text2;
+    }
+
+    const range = startRange.startContainer.ownerDocument.createRange();
+    range.setStart(startRange.startContainer, startRange.startOffset);
+    range.setEnd(endRange.endContainer, endRange.endOffset);
+
+    const fragment = range.cloneContents();
+    const div = document.createElement('div');
+    div.appendChild(fragment);
+    return extractReadableText(div);
+
+  } catch (e) {
+    console.error("Error getting page text for TTS:", e);
+    // Fallback to the old method if the new one fails
+    const view = currentRendition.manager.views.last();
+    if (view && view.iframe) {
+      return extractReadableText(view.iframe.contentWindow.document.body);
+    }
+    return '';
+  }
+}
+
 async function readCurrentPage() {
   if (!currentRendition || !isAutoReading) return;
-  const view = currentRendition.manager.views.last();
-  if (!view || !view.iframe) return;
-  const body = view.iframe.contentWindow.document.body;
-  const text = extractReadableText(body);
+
+  const text = await getCurrentPageText();
   if (!text || text.trim() === '') {
     // If page is blank, just go to the next one
     if (isAutoReading) {
