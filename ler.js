@@ -81,6 +81,16 @@ function extractReadableText(bodyElement) {
   return clonedBody.textContent;
 }
 
+function extractBaseText(bodyElement) {
+  const clonedBody = bodyElement.cloneNode(true);
+  const rubies = clonedBody.querySelectorAll('ruby');
+  rubies.forEach(ruby => {
+    // Remove rt and rp elements to leave only the base text within the ruby tag
+    ruby.querySelectorAll('rt, rp').forEach(e => e.remove());
+  });
+  return clonedBody.textContent;
+}
+
 async function getCurrentPageText() {
   if (!currentRendition) {
     return '';
@@ -876,7 +886,12 @@ async function gotoCFI(cfi) {
 async function addNewBookmark() {
   if (!currentBookId || !currentRendition) return;
 
-  const cfi = currentRendition.currentLocation().start.cfi;
+  const location = currentRendition.currentLocation();
+  if (!location || !location.start || !location.end) {
+    return;
+  }
+  const startCfi = location.start.cfi;
+  const endCfi = location.end.cfi;
 
   const existing = await new Promise((resolve, reject) => {
     const trans = db.transaction([STORE_BOOKMARKS_NAME], 'readonly');
@@ -887,7 +902,7 @@ async function addNewBookmark() {
     request.onsuccess = event => {
       const cursor = event.target.result;
       if (cursor) {
-        if (cursor.value.cfi === cfi) {
+        if (cursor.value.cfi === startCfi) {
           found = true;
         }
         cursor.continue();
@@ -905,14 +920,19 @@ async function addNewBookmark() {
 
   let textSnippet = "Bookmark"; // Default text
   try {
-    const range = await currentBook.getRange(cfi);
-    if (range && range.commonAncestorContainer && range.commonAncestorContainer.textContent) {
-        const content = range.commonAncestorContainer.textContent.trim().replace(/\s+/g, ' ');
-        const startIndex = Math.max(0, range.startOffset - 50);
-        const text = content.substring(startIndex, startIndex + 100);
-        if (text) {
-            textSnippet = text;
-        }
+    const startRange = await currentBook.getRange(startCfi);
+    const endRange = await currentBook.getRange(endCfi);
+    const range = startRange.startContainer.ownerDocument.createRange();
+    range.setStart(startRange.startContainer, startRange.startOffset);
+    range.setEnd(endRange.endContainer, endRange.endOffset);
+
+    const fragment = range.cloneContents();
+    const div = document.createElement('div');
+    div.appendChild(fragment);
+
+    const text = extractBaseText(div).substring(0, 100);
+    if (text) {
+      textSnippet = text;
     }
   } catch (e) {
     console.error("Could not generate text snippet for bookmark:", e);
@@ -920,7 +940,7 @@ async function addNewBookmark() {
 
   const newBookmark = {
     bookId: currentBookId,
-    cfi: cfi,
+    cfi: startCfi,
     text: textSnippet,
     created: Date.now()
   };
