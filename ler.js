@@ -28,6 +28,8 @@ let comicInfoPageLayouts = new Map();
 let synth = window.speechSynthesis;
 let currentUtterance = null;
 let isAutoReading = false;
+let isSelectionModeActive = false;
+let selectedBookIds = new Set();
 
 function showControls() {
   const controls = document.getElementById('reader-controls');
@@ -217,6 +219,32 @@ function stopReading() {
   document.getElementById('tts-stop').style.display = 'none';
 }
 
+function enterSelectionMode() {
+  isSelectionModeActive = true;
+  document.getElementById('book-management').classList.add('selection-mode');
+  document.getElementById('library-controls').style.display = 'none';
+  document.getElementById('bulk-actions-pane').style.display = 'flex';
+  updateSelectionCount();
+}
+
+function exitSelectionMode() {
+  isSelectionModeActive = false;
+  document.getElementById('book-management').classList.remove('selection-mode');
+  document.getElementById('library-controls').style.display = 'flex';
+  document.getElementById('bulk-actions-pane').style.display = 'none';
+  selectedBookIds.clear();
+  // Remove 'selected' class from all tiles
+  document.querySelectorAll('.book-tile.selected').forEach(tile => {
+    tile.classList.remove('selected');
+  });
+}
+
+function updateSelectionCount() {
+  const count = selectedBookIds.size;
+  const countElement = document.getElementById('selection-count');
+  countElement.textContent = `${count} book${count !== 1 ? 's' : ''} selected`;
+}
+
 function initDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -360,7 +388,40 @@ window.addEventListener('load', async () => {
 
   const sortBy = document.getElementById('sort-by');
   sortBy.addEventListener('change', displayBooks);
+
+  // Bulk action event listeners
+  document.getElementById('bulk-cancel').addEventListener('click', exitSelectionMode);
+  document.getElementById('bulk-delete').addEventListener('click', bulkDelete);
+  document.getElementById('bulk-state-change').addEventListener('change', bulkUpdateState);
 });
+
+async function bulkDelete() {
+  const numSelected = selectedBookIds.size;
+  if (numSelected === 0) return;
+
+  if (confirm(`Are you sure you want to delete ${numSelected} book(s)?`)) {
+    for (const bookId of selectedBookIds) {
+      deleteBook(bookId, false); // Pass false to prevent re-displaying books each time
+    }
+    exitSelectionMode();
+    displayBooks(); // Refresh the book list once at the end
+  }
+}
+
+async function bulkUpdateState(event) {
+  const state = event.target.value;
+  if (!state) return;
+
+  const promises = [];
+  for (const bookId of selectedBookIds) {
+    promises.push(updateBookState(bookId, state, false)); // Pass false to prevent re-displaying
+  }
+  await Promise.all(promises);
+
+  event.target.value = ""; // Reset dropdown
+  exitSelectionMode();
+  displayBooks(); // Refresh list at the end
+}
 
 async function closeReader() {
   if (isClosing) return; // Prevent re-entrancy
@@ -1262,7 +1323,7 @@ async function resizeImageBlob(blob, maxWidth = 400, maxHeight = 400) {
   });
 }
 
-function deleteBook(bookId) {
+function deleteBook(bookId, shouldRefresh = true) {
   const bookTx = db.transaction([STORE_BOOKS_NAME], 'readwrite');
   bookTx.objectStore(STORE_BOOKS_NAME).delete(bookId);
 
@@ -1283,7 +1344,9 @@ function deleteBook(bookId) {
 
   bookmarkTx.oncomplete = () => {
     console.log(`Bookmarks for book ${bookId} deleted.`);
-    displayBooks();
+    if (shouldRefresh) {
+      displayBooks();
+    }
   };
   bookmarkTx.onerror = (event) => {
     console.error('Error deleting bookmarks:', event.target.error);
@@ -1320,26 +1383,37 @@ async function downloadBook(bookId) {
   }
 }
 
-function updateBookState(bookId, state) {
-  const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
-  const store = transaction.objectStore(STORE_METADATA_NAME);
-  const request = store.get(bookId);
-  request.onsuccess = () => {
-    const data = request.result;
-    if (data) {
-      data.state = state;
-      if (state === 'unread') {
-        data.progress = 0;
-        delete data.lastLocation;
-      } else if (state === 'finished') {
-        data.progress = 1;
+function updateBookState(bookId, state, shouldRefresh = true) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_METADATA_NAME);
+    const request = store.get(bookId);
+
+    request.onerror = event => reject(event.target.error);
+
+    request.onsuccess = () => {
+      const data = request.result;
+      if (data) {
+        data.state = state;
+        if (state === 'unread') {
+          data.progress = 0;
+          delete data.lastLocation;
+        } else if (state === 'finished') {
+          data.progress = 1;
+        }
+        store.put(data);
       }
-      store.put(data);
-    }
-  };
-  transaction.oncomplete = () => {
-    displayBooks();
-  };
+    };
+
+    transaction.oncomplete = () => {
+      if (shouldRefresh) {
+        displayBooks();
+      }
+      resolve();
+    };
+
+    transaction.onerror = event => reject(event.target.error);
+  });
 }
 
 
@@ -1393,7 +1467,41 @@ function displayBooks() {
       filteredBooks.forEach((book) => {
         const tile = document.createElement('div');
         tile.className = 'book-tile';
-        tile.addEventListener('click', () => openBook(book.id));
+        tile.dataset.bookId = book.id;
+
+        // --- Selection Logic ---
+        let pressTimer;
+
+        const startPress = (e) => {
+          if (isSelectionModeActive) return;
+          pressTimer = setTimeout(() => {
+            e.preventDefault();
+            enterSelectionMode();
+          }, 500); // 500ms for long press
+        };
+
+        const cancelPress = () => {
+          clearTimeout(pressTimer);
+        };
+
+        tile.addEventListener('mousedown', startPress);
+        tile.addEventListener('mouseup', cancelPress);
+        tile.addEventListener('mouseleave', cancelPress);
+        tile.addEventListener('touchstart', startPress);
+        tile.addEventListener('touchend', cancelPress);
+        tile.addEventListener('touchcancel', cancelPress);
+
+        tile.addEventListener('click', () => {
+          if (isSelectionModeActive) {
+            toggleSelection(book.id, tile);
+          } else {
+            openBook(book.id);
+          }
+        });
+
+        const selectionIndicator = document.createElement('div');
+        selectionIndicator.className = 'selection-indicator';
+        tile.appendChild(selectionIndicator);
 
         const cover = document.createElement('div');
         cover.className = 'book-cover';
@@ -1449,10 +1557,10 @@ function displayBooks() {
           const link = document.createElement('a');
           link.href = '#';
           link.textContent = state.charAt(0).toUpperCase() + state.slice(1);
-          link.addEventListener('click', (event) => {
+          link.addEventListener('click', async (event) => {
             event.preventDefault();
             event.stopPropagation();
-            updateBookState(book.id, state);
+            await updateBookState(book.id, state);
             menuContent.classList.remove('show-menu');
           });
           resetMenu.appendChild(link);
@@ -1524,7 +1632,19 @@ function displayBooks() {
   };
 }
 
+function toggleSelection(bookId, tileElement) {
+  if (selectedBookIds.has(bookId)) {
+    selectedBookIds.delete(bookId);
+    tileElement.classList.remove('selected');
+  } else {
+    selectedBookIds.add(bookId);
+    tileElement.classList.add('selected');
+  }
+  updateSelectionCount();
+}
+
 function openBook(bookId) {
+  if (isSelectionModeActive) return;
   currentBookId = bookId;
 
   Promise.all([

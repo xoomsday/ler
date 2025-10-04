@@ -58,3 +58,32 @@ body.dark-mode {
   color: #e0e0e0;
   border-color: #333;
 }
+
+.dark-mode .book-tile.selected {
+  border-color: #00aaff; /* A brighter blue for dark mode */
+}
+
+.dark-mode .book-tile.selected::after {
+  background-color: rgba(0, 170, 255, 0.15);
+}
+
+.dark-mode .selection-indicator {
+  border-color: #ccc;
+  background-color: #333;
+}
+
+.dark-mode .book-tile.selected .selection-indicator::after {
+  color: #00aaff;
+}
+
+.dark-mode #bulk-actions-pane {
+  background-color: #1e1e1e;
+  border-bottom-color: #444;
+}
+
+.dark-mode #bulk-actions-pane button,
+.dark-mode #bulk-actions-pane select {
+  background-color: #333;
+  border-color: #555;
+  color: #e0e0e0;
+}

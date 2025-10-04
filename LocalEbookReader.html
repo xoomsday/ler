@@ -16,24 +16,37 @@
     <div id="top-pane">
       <label for="epub-upload" class="button-like-label">+</label>
       <input type="file" id="epub-upload" accept=".epub,.cbz" style="display: none;" multiple>
-      <div id="filters">
-        <span>Filter by state:</span>
-        <label><input type="checkbox" name="state" value="unread" checked> Unread</label>
-        <label><input type="checkbox" name="state" value="reading" checked> Reading</label>
-        <label><input type="checkbox" name="state" value="finished" checked> Finished</label>
+      <div id="library-controls">
+        <div id="filters">
+          <span>Filter by state:</span>
+          <label><input type="checkbox" name="state" value="unread" checked> Unread</label>
+          <label><input type="checkbox" name="state" value="reading" checked> Reading</label>
+          <label><input type="checkbox" name="state" value="finished" checked> Finished</label>
+        </div>
+        <div id="sorting">
+          <span>Sort by:</span>
+          <select id="sort-by">
+            <option value="title">Title</option>
+            <option value="last-read">Last Read</option>
+          </select>
+        </div>
       </div>
-      <div id="sorting">
-        <span>Sort by:</span>
-        <select id="sort-by">
-          <option value="title">Title</option>
-          <option value="last-read">Last Read</option>
+      <div id="bulk-actions-pane" style="display: none;">
+        <span id="selection-count">0 books selected</span>
+        <button id="bulk-delete">Delete</button>
+        <select id="bulk-state-change">
+          <option value="">Mark as...</option>
+          <option value="unread">Unread</option>
+          <option value="reading">Reading</option>
+          <option value="finished">Finished</option>
         </select>
+        <button id="bulk-cancel">Cancel</button>
       </div>
       <div style="display: inline; position: absolute;
                   font-size: 8pt;
                   right: 2px; top: 0; opacity: 0.3"
-           id="dateStamp">20251003.1435</div>
-    </div>
+           id="dateStamp">20251003.2110</div>
+      </div>
     <div id="book-grid"></div>
   </div>
 
