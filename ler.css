@@ -444,8 +444,26 @@ h1 {
 
 #next-page-area {
   right: 0;
-  border-radius: 10px 0 0 10px;
 }
+
+#progress-indicator {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  z-index: 3;
+  opacity: 1;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.controls-hidden + #progress-indicator {
+  opacity: 0;
+}
+
 
 #next-page-area::after {
   content: '›';

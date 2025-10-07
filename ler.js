@@ -433,6 +433,36 @@ async function bulkUpdateState(event) {
   displayBooks(); // Refresh list at the end
 }
 
+function updateProgressIndicator() {
+  const indicator = document.getElementById('progress-indicator');
+  if (!currentBookId || (currentBookType === 'epub' && !currentRendition)) {
+    indicator.style.display = 'none';
+    return;
+  }
+
+  indicator.style.display = 'block';
+
+  if (currentBookType === 'cbz') {
+    if (comicBookPages.length > 0) {
+      indicator.textContent = `(${currentComicPage + 1}/${comicBookPages.length})`;
+    } else {
+      indicator.textContent = '';
+    }
+  } else { // epub
+    if (currentBook && currentBook.locations && currentRendition && currentRendition.currentLocation()) {
+      const location = currentRendition.currentLocation();
+      const percentage = currentBook.locations.percentageFromCfi(location.start.cfi);
+      if (percentage !== null && !isNaN(percentage)) {
+        indicator.textContent = `(${(percentage * 100).toFixed(0)}%)`;
+      } else {
+        indicator.textContent = '';
+      }
+    } else {
+      indicator.textContent = '';
+    }
+  }
+}
+
 async function closeReader() {
   if (isClosing) return; // Prevent re-entrancy
   isClosing = true;
@@ -447,6 +477,7 @@ async function closeReader() {
 
   document.getElementById('reader-view').style.display = 'none';
   document.getElementById('viewer').innerHTML = '';
+  document.getElementById('progress-indicator').style.display = 'none';
   document.getElementById('book-management').style.display = 'block';
   document.getElementById('help-overlay').style.display = 'none';
 
@@ -1000,7 +1031,6 @@ async function nextEpubPage() {
 async function prevEpubPage() {
   if (!currentRendition) return;
   await currentRendition.prev();
-  await saveLastLocation();
 }
 
 async function nextCbzPage() {
@@ -1910,6 +1940,7 @@ async function displayComicPage(pageNumber) {
   }
 
   await saveLastLocation();
+  updateProgressIndicator();
 }
 
 function getImageDimensions(pageFile) {
@@ -1990,6 +2021,11 @@ function openRendition(bookData, metadata) {
     currentBookDirection = currentBook.packaging.metadata.direction || 'ltr';
 
     currentRendition = currentBook.renderTo('viewer', { width: '100%', height: '100%' });
+
+    currentRendition.on('relocated', (location) => {
+      updateProgressIndicator();
+      saveLastLocation();
+    });
 
     currentRendition.on('rendered', () => {
       const view = currentRendition.manager.views.last();

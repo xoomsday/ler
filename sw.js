@@ -1,4 +1,5 @@
-const CACHE_NAME = 'ler-cache-v1';
+const CACHE_NAME = 'ler-cache-2';
+
 const assetsToCache = [
   './',
   './LocalEbookReader.html',
