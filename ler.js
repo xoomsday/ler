@@ -430,6 +430,28 @@ window.addEventListener('load', async () => {
   // Re-display books when a filter checkbox is changed
   stateFilterOptions.addEventListener('change', displayBooks);
 
+  // --- New Tag Filter Dropdown Logic ---
+  const tagFilterBtn = document.getElementById('tag-filter-btn');
+  const tagFilterOptions = document.getElementById('tag-filter-options');
+
+  tagFilterBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    tagFilterOptions.classList.toggle('show');
+  });
+
+  // We can reuse the window click listener to close this dropdown as well
+  window.addEventListener('click', (event) => {
+    if (!event.target.matches('.filter-btn')) {
+      if (tagFilterOptions.classList.contains('show')) {
+        tagFilterOptions.classList.remove('show');
+      }
+    }
+  });
+
+  tagFilterOptions.addEventListener('change', displayBooks);
+
+  populateTagFilter(); // Populate tags on load
+
 
   // Bulk action event listeners
   document.getElementById('bulk-cancel').addEventListener('click', exitSelectionMode);
@@ -448,10 +470,30 @@ window.addEventListener('load', async () => {
   });
 });
 
+async function populateTagFilter() {
+  const optionsContainer = document.getElementById('tag-filter-options');
+  optionsContainer.innerHTML = ''; // Clear existing
+
+  const transaction = db.transaction([STORE_TAGS_NAME], 'readonly');
+  const tags = await new Promise(resolve => transaction.objectStore(STORE_TAGS_NAME).getAll().onsuccess = e => resolve(e.target.result));
+
+  tags.sort((a, b) => a.name.localeCompare(b.name));
+
+  tags.forEach(tag => {
+    const label = document.createElement('label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.name = 'tag';
+    checkbox.value = tag.id;
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(` ${tag.name}`));
+    optionsContainer.appendChild(label);
+  });
+}
+
 async function bulkDelete() {
   const numSelected = selectedBookIds.size;
   if (numSelected === 0) return;
-
   if (confirm(`Are you sure you want to delete ${numSelected} book(s)?`)) {
     for (const bookId of selectedBookIds) {
       deleteBook(bookId, false); // Pass false to prevent re-displaying books each time
@@ -1667,26 +1709,54 @@ function displayBooks() {
     bookGrid.removeChild(bookGrid.firstChild);
   }
 
-  const transaction = db.transaction([STORE_BOOKS_NAME], 'readonly');
+  const transaction = db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME, STORE_BOOK_TAGS_NAME], 'readonly');
   const store = transaction.objectStore(STORE_BOOKS_NAME);
   const request = store.getAll();
 
-  request.onsuccess = () => {
+  request.onsuccess = async () => {
     const books = request.result;
     const metadataTransaction = db.transaction([STORE_METADATA_NAME], 'readonly');
     const metadataStore = metadataTransaction.objectStore(STORE_METADATA_NAME);
     const metadataRequest = metadataStore.getAll();
 
-    metadataRequest.onsuccess = () => {
+    metadataRequest.onsuccess = async () => {
       const metadataResults = metadataRequest.result;
       const metadataMap = new Map(metadataResults.map(m => [m.bookId, m]));
 
+      // --- State Filtering ---
       const filterStateCheckboxes = document.querySelectorAll('#state-filter-options input[name="state"]');
-      const activeFilters = [...filterStateCheckboxes].filter(cb => cb.checked).map(cb => cb.value);
+      const activeStateFilters = [...filterStateCheckboxes].filter(cb => cb.checked).map(cb => cb.value);
+
+      // --- Tag Filtering ---
+      const filterTagCheckboxes = document.querySelectorAll('#tag-filter-options input[name="tag"]');
+      const activeTagFilters = [...filterTagCheckboxes].filter(cb => cb.checked).map(cb => parseInt(cb.value, 10));
+
+      let booksMatchingTags = null;
+      if (activeTagFilters.length > 0) {
+        const bookTagsTx = db.transaction([STORE_BOOK_TAGS_NAME], 'readonly');
+        const bookTagsStore = bookTagsTx.objectStore(STORE_BOOK_TAGS_NAME);
+        booksMatchingTags = new Set();
+
+        for (const tagId of activeTagFilters) {
+          const tagIndex = bookTagsStore.index('by_tagId');
+          const booksForTag = await new Promise(resolve => tagIndex.getAll(tagId).onsuccess = e => resolve(e.target.result));
+          booksForTag.forEach(bookTag => {
+            booksMatchingTags.add(bookTag.bookId);
+          });
+        }
+      }
 
       const filteredBooks = books.filter(book => {
         const meta = metadataMap.get(book.id);
-        return meta && activeFilters.includes(meta.state);
+        // State filter check
+        if (!meta || !activeStateFilters.includes(meta.state)) {
+          return false;
+        }
+        // Tag filter check
+        if (booksMatchingTags && !booksMatchingTags.has(book.id)) {
+          return false;
+        }
+        return true;
       });
 
       const sortBy = document.getElementById('sort-by').value;
