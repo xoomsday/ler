@@ -457,6 +457,8 @@ window.addEventListener('load', async () => {
   document.getElementById('bulk-cancel').addEventListener('click', exitSelectionMode);
   document.getElementById('bulk-delete').addEventListener('click', bulkDelete);
   document.getElementById('bulk-state-change').addEventListener('change', bulkUpdateState);
+  document.getElementById('bulk-add-tag').addEventListener('change', bulkAddTag);
+  document.getElementById('bulk-remove-tag').addEventListener('change', bulkRemoveTag);
 
   // Tag Editor buttons
   document.getElementById('tag-editor-cancel').addEventListener('click', closeTagEditor);
@@ -479,6 +481,8 @@ async function populateTagFilter() {
 
   tags.sort((a, b) => a.name.localeCompare(b.name));
 
+  populateBulkTagDropdowns(tags); // New call to populate bulk dropdowns
+
   tags.forEach(tag => {
     const label = document.createElement('label');
     const checkbox = document.createElement('input');
@@ -489,6 +493,71 @@ async function populateTagFilter() {
     label.appendChild(document.createTextNode(` ${tag.name}`));
     optionsContainer.appendChild(label);
   });
+}
+
+function populateBulkTagDropdowns(tags) {
+  const addSelect = document.getElementById('bulk-add-tag');
+  const removeSelect = document.getElementById('bulk-remove-tag');
+  addSelect.innerHTML = '<option value="">Add tag...</option>';
+  removeSelect.innerHTML = '<option value="">Remove tag...</option>';
+
+  tags.forEach(tag => {
+    const option1 = document.createElement('option');
+    option1.value = tag.id;
+    option1.textContent = tag.name;
+    addSelect.appendChild(option1);
+
+    const option2 = document.createElement('option');
+    option2.value = tag.id;
+    option2.textContent = tag.name;
+    removeSelect.appendChild(option2);
+  });
+}
+
+async function bulkAddTag(event) {
+  const tagId = parseInt(event.target.value, 10);
+  if (!tagId || selectedBookIds.size === 0) return;
+
+  const transaction = db.transaction([STORE_BOOK_TAGS_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_BOOK_TAGS_NAME);
+
+  for (const bookId of selectedBookIds) {
+    // This could create duplicates, but it's safe for now.
+    // A robust implementation would check for existence first.
+    store.add({ bookId, tagId });
+  }
+
+  await new Promise(resolve => transaction.oncomplete = resolve);
+  const tagName = event.target.options[event.target.selectedIndex].text;
+  alert(`${selectedBookIds.size} book(s) tagged with "${tagName}".`);
+  event.target.value = ""; // Reset dropdown
+}
+
+async function bulkRemoveTag(event) {
+  const tagId = parseInt(event.target.value, 10);
+  if (!tagId || selectedBookIds.size === 0) return;
+
+  const transaction = db.transaction([STORE_BOOK_TAGS_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_BOOK_TAGS_NAME);
+  const bookIndex = store.index('by_bookId');
+
+  for (const bookId of selectedBookIds) {
+    const request = bookIndex.openCursor(IDBKeyRange.only(bookId));
+    request.onsuccess = e => {
+      const cursor = e.target.result;
+      if (cursor) {
+        if (cursor.value.tagId === tagId) {
+          cursor.delete();
+        }
+        cursor.continue();
+      }
+    };
+  }
+
+  await new Promise(resolve => transaction.oncomplete = resolve);
+  const tagName = event.target.options[event.target.selectedIndex].text;
+  alert(`Tag "${tagName}" removed from ${selectedBookIds.size} book(s).`);
+  event.target.value = ""; // Reset dropdown
 }
 
 async function bulkDelete() {
