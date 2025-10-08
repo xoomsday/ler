@@ -1,10 +1,12 @@
 // LER javascript
 
 const DB_NAME = 'ler-books';
-const DB_VERSION = 2;
+const DB_VERSION = 4;
 const STORE_BOOKS_NAME = 'epubs';
 const STORE_METADATA_NAME = 'metadata';
 const STORE_BOOKMARKS_NAME = 'bookmarks';
+const STORE_TAGS_NAME = 'tags';
+const STORE_BOOK_TAGS_NAME = 'book_tags';
 
 let db;
 let currentBook;
@@ -271,6 +273,17 @@ function initDB() {
         const bookmarksStore = db.createObjectStore(STORE_BOOKMARKS_NAME, { keyPath: 'id', autoIncrement: true });
         bookmarksStore.createIndex('by_bookId', 'bookId', { unique: false });
       }
+      if (event.oldVersion < 4) {
+        if (!db.objectStoreNames.contains(STORE_TAGS_NAME)) {
+          const tagsStore = db.createObjectStore(STORE_TAGS_NAME, { keyPath: 'id', autoIncrement: true });
+          tagsStore.createIndex('by_name', 'name', { unique: true });
+        }
+        if (!db.objectStoreNames.contains(STORE_BOOK_TAGS_NAME)) {
+          const bookTagsStore = db.createObjectStore(STORE_BOOK_TAGS_NAME, { keyPath: 'id', autoIncrement: true });
+          bookTagsStore.createIndex('by_bookId', 'bookId', { unique: false });
+          bookTagsStore.createIndex('by_tagId', 'tagId', { unique: false });
+        }
+      }
     };
 
     request.onsuccess = (event) => {
@@ -393,16 +406,46 @@ window.addEventListener('load', async () => {
     controlsTimer = setTimeout(hideControls, 3000);
   });
 
-  const filterCheckboxes = document.querySelectorAll('#filters input[name="state"]');
-  filterCheckboxes.forEach(cb => cb.addEventListener('change', displayBooks));
-
   const sortBy = document.getElementById('sort-by');
   sortBy.addEventListener('change', displayBooks);
+
+  // --- New State Filter Dropdown Logic ---
+  const stateFilterBtn = document.getElementById('state-filter-btn');
+  const stateFilterOptions = document.getElementById('state-filter-options');
+
+  stateFilterBtn.addEventListener('click', (event) => {
+    event.stopPropagation(); // Prevent the window click listener from closing it immediately
+    stateFilterOptions.classList.toggle('show');
+  });
+
+  // Close the dropdown if the user clicks outside of it
+  window.addEventListener('click', (event) => {
+    if (!event.target.matches('.filter-btn')) {
+      if (stateFilterOptions.classList.contains('show')) {
+        stateFilterOptions.classList.remove('show');
+      }
+    }
+  });
+
+  // Re-display books when a filter checkbox is changed
+  stateFilterOptions.addEventListener('change', displayBooks);
+
 
   // Bulk action event listeners
   document.getElementById('bulk-cancel').addEventListener('click', exitSelectionMode);
   document.getElementById('bulk-delete').addEventListener('click', bulkDelete);
   document.getElementById('bulk-state-change').addEventListener('change', bulkUpdateState);
+
+  // Tag Editor buttons
+  document.getElementById('tag-editor-cancel').addEventListener('click', closeTagEditor);
+  document.getElementById('tag-editor-save').addEventListener('click', saveBookTags);
+  document.getElementById('add-tag-btn').addEventListener('click', addNewTagFromInput);
+  document.getElementById('new-tag-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addNewTagFromInput();
+    }
+  });
 });
 
 async function bulkDelete() {
@@ -1403,6 +1446,156 @@ function deleteBook(bookId, shouldRefresh = true) {
   };
 }
 
+// --- Tag Editor Logic ---
+let tagEditorState = {
+  bookId: null,
+  currentTagIds: new Set(),
+  allTags: [],
+};
+
+async function openTagEditor(bookId, bookName) {
+  tagEditorState.bookId = bookId;
+
+  // Set title
+  document.getElementById('tag-editor-title').textContent = `Edit Tags for: ${bookName}`;
+
+  // Fetch all tags and the book's current tags in parallel
+  const transaction = db.transaction([STORE_TAGS_NAME, STORE_BOOK_TAGS_NAME], 'readonly');
+  const tagsStore = transaction.objectStore(STORE_TAGS_NAME);
+  const bookTagsStore = transaction.objectStore(STORE_BOOK_TAGS_NAME);
+  const bookTagsIndex = bookTagsStore.index('by_bookId');
+
+  const allTagsPromise = new Promise(resolve => tagsStore.getAll().onsuccess = e => resolve(e.target.result));
+  const bookTagsPromise = new Promise(resolve => bookTagsIndex.getAll(bookId).onsuccess = e => resolve(e.target.result));
+
+  const [allTags, bookTags] = await Promise.all([allTagsPromise, bookTagsPromise]);
+
+  tagEditorState.allTags = allTags;
+  tagEditorState.currentTagIds = new Set(bookTags.map(bt => bt.tagId));
+
+  renderTagsInEditor();
+
+  // Show the modal
+  document.getElementById('tag-editor-overlay').style.display = 'flex';
+}
+
+function renderTagsInEditor() {
+  const currentTagsContainer = document.getElementById('current-tags');
+  const allTagsContainer = document.getElementById('all-tags');
+  currentTagsContainer.innerHTML = '';
+  allTagsContainer.innerHTML = '';
+
+  const tagsById = new Map(tagEditorState.allTags.map(t => [t.id, t]));
+
+  tagEditorState.allTags.forEach(tag => {
+    const isCurrent = tagEditorState.currentTagIds.has(tag.id);
+    const pill = document.createElement('div');
+    pill.className = 'tag-pill';
+    pill.textContent = tag.name;
+
+    if (isCurrent) {
+      pill.dataset.tagId = tag.id;
+      const removeBtn = document.createElement('span');
+      removeBtn.className = 'remove-tag';
+      removeBtn.textContent = 'x';
+      removeBtn.onclick = (e) => {
+        e.stopPropagation();
+        tagEditorState.currentTagIds.delete(tag.id);
+        renderTagsInEditor();
+      };
+      pill.appendChild(removeBtn);
+      currentTagsContainer.appendChild(pill);
+    } else {
+      pill.classList.add('add-tag');
+      pill.onclick = () => {
+        tagEditorState.currentTagIds.add(tag.id);
+        renderTagsInEditor();
+      };
+      allTagsContainer.appendChild(pill);
+    }
+  });
+}
+
+async function addNewTagFromInput() {
+  const input = document.getElementById('new-tag-name');
+  const tagName = input.value.trim().toLowerCase();
+  if (!tagName) return;
+
+  // Check if tag already exists
+  const existingTag = tagEditorState.allTags.find(t => t.name === tagName);
+  if (existingTag) {
+    tagEditorState.currentTagIds.add(existingTag.id);
+    input.value = '';
+    renderTagsInEditor();
+    return;
+  }
+
+  // Tag doesn't exist, create it
+  const transaction = db.transaction([STORE_TAGS_NAME], 'readwrite');
+  const request = transaction.objectStore(STORE_TAGS_NAME).add({ name: tagName });
+
+  request.onsuccess = (event) => {
+    const newTagId = event.target.result;
+    tagEditorState.allTags.push({ id: newTagId, name: tagName });
+    tagEditorState.currentTagIds.add(newTagId);
+    input.value = '';
+    renderTagsInEditor();
+  };
+}
+
+async function saveBookTags() {
+  const bookId = tagEditorState.bookId;
+  const newTagIds = tagEditorState.currentTagIds;
+
+  const transaction = db.transaction([STORE_BOOK_TAGS_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_BOOK_TAGS_NAME);
+  const index = store.index('by_bookId');
+
+  // 1. Get all existing associations for this book
+  const existingAssocs = await new Promise(resolve => index.getAll(bookId).onsuccess = e => resolve(e.target.result));
+
+  // 2. Delete associations that are no longer needed
+  existingAssocs.forEach(assoc => {
+    if (!newTagIds.has(assoc.tagId)) {
+      store.delete(assoc.id);
+    }
+  });
+
+  // 3. Add new associations
+  const existingTagIds = new Set(existingAssocs.map(a => a.tagId));
+  newTagIds.forEach(tagId => {
+    if (!existingTagIds.has(tagId)) {
+      store.add({ bookId: bookId, tagId: tagId });
+    }
+  });
+
+  transaction.oncomplete = () => {
+    closeTagEditor();
+  };
+}
+
+function closeTagEditor() {
+  document.getElementById('tag-editor-overlay').style.display = 'none';
+  tagEditorState = { bookId: null, currentTagIds: new Set(), allTags: [] }; // Reset state
+}
+
+// Hook up tag editor event listeners in the main load event
+window.addEventListener('load', async () => {
+  // ... (existing load event code)
+
+  // Tag Editor buttons
+  document.getElementById('tag-editor-cancel').addEventListener('click', closeTagEditor);
+  document.getElementById('tag-editor-save').addEventListener('click', saveBookTags);
+  document.getElementById('add-tag-btn').addEventListener('click', addNewTagFromInput);
+  document.getElementById('new-tag-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addNewTagFromInput();
+    }
+  });
+});
+
+
 async function downloadBook(bookId) {
   try {
     const book = await getFromDB(STORE_BOOKS_NAME, bookId);
@@ -1488,7 +1681,7 @@ function displayBooks() {
       const metadataResults = metadataRequest.result;
       const metadataMap = new Map(metadataResults.map(m => [m.bookId, m]));
 
-      const filterStateCheckboxes = document.querySelectorAll('#filters input[name="state"]');
+      const filterStateCheckboxes = document.querySelectorAll('#state-filter-options input[name="state"]');
       const activeFilters = [...filterStateCheckboxes].filter(cb => cb.checked).map(cb => cb.value);
 
       const filteredBooks = books.filter(book => {
@@ -1597,6 +1790,17 @@ function displayBooks() {
         downloadLink.href = '#';
         downloadLink.textContent = 'Download';
         menuContent.appendChild(downloadLink);
+
+        const tagLink = document.createElement('a');
+        tagLink.href = '#';
+        tagLink.textContent = 'Edit Tags';
+        tagLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openTagEditor(book.id, book.name);
+          menuContent.classList.remove('show-menu');
+        });
+        menuContent.appendChild(tagLink);
 
         const resetMenu = document.createElement('div');
         resetMenu.innerHTML = '<hr><span>Reset State:</span>';

@@ -54,6 +54,46 @@ h1 {
   gap: 1em;
 }
 
+.filter-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.filter-btn {
+  background-color: #efefef;
+  border: 1px solid #ccc;
+  padding: 0.5em 1em;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.filter-options {
+  display: none;
+  position: absolute;
+  background-color: #f9f9f9;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.filter-options label {
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+}
+
+.filter-options label:hover {
+  background-color: #f1f1f1;
+}
+
+.filter-options.show {
+  display: block;
+}
+
+
 .book-management.selection-mode #library-controls {
   display: none;
 }
@@ -512,4 +552,92 @@ h1 {
   text-align: center;
   cursor: pointer;
   margin-top: 2em;
+}
+
+/* --- Tag Editor Modal --- */
+#tag-editor-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#tag-editor-modal {
+  background-color: white;
+  padding: 2em;
+  border-radius: 5px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#tag-editor-title {
+  margin-top: 0;
+  font-size: 1.2em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-editor-section {
+  margin-bottom: 1em;
+  overflow-y: auto; /* Make sections scrollable if content overflows */
+}
+
+.tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  padding: 0.5em;
+  border: 1px solid #ccc;
+  min-height: 30px;
+  border-radius: 3px;
+}
+
+.tag-pill {
+  background-color: #007bff;
+  color: white;
+  padding: 0.3em 0.7em;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.tag-pill.add-tag {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.tag-pill .remove-tag {
+  margin-left: 0.5em;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#add-tag-form {
+  display: flex;
+}
+#new-tag-name {
+  flex-grow: 1;
+  padding: 0.5em;
+  border: 1px solid #ccc;
+}
+#add-tag-btn {
+  padding: 0.5em 1em;
+}
+
+#tag-editor-actions {
+  margin-top: auto; /* Push actions to the bottom */
+  padding-top: 1em;
+  border-top: 1px solid #eee;
+  text-align: right;
 }

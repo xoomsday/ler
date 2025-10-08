@@ -17,11 +17,13 @@
       <label for="epub-upload" class="button-like-label">+</label>
       <input type="file" id="epub-upload" accept=".epub,.cbz" style="display: none;" multiple>
       <div id="library-controls">
-        <div id="filters">
-          <span>Filter by state:</span>
-          <label><input type="checkbox" name="state" value="unread" checked> Unread</label>
-          <label><input type="checkbox" name="state" value="reading" checked> Reading</label>
-          <label><input type="checkbox" name="state" value="finished" checked> Finished</label>
+        <div id="state-filter" class="filter-dropdown">
+          <button id="state-filter-btn" class="filter-btn">Filter by State</button>
+          <div id="state-filter-options" class="filter-options">
+            <label><input type="checkbox" name="state" value="unread" checked> Unread</label>
+            <label><input type="checkbox" name="state" value="reading" checked> Reading</label>
+            <label><input type="checkbox" name="state" value="finished" checked> Finished</label>
+          </div>
         </div>
         <div id="sorting">
           <span>Sort by:</span>
@@ -105,5 +107,30 @@
         .catch((err) => console.log('Service worker not registered.', err));
     }
   </script>
+
+  <div id="tag-editor-overlay" style="display: none;">
+    <div id="tag-editor-modal">
+      <h2 id="tag-editor-title">Edit Tags for...</h2>
+      <div class="tag-editor-section">
+        <h3>Current Tags</h3>
+        <div id="current-tags" class="tag-container"></div>
+      </div>
+      <div class="tag-editor-section">
+        <h3>Add New Tag</h3>
+        <div id="add-tag-form">
+          <input type="text" id="new-tag-name" placeholder="Enter a new tag">
+          <button id="add-tag-btn">Add</button>
+        </div>
+      </div>
+      <div class="tag-editor-section">
+        <h3>All Tags</h3>
+        <div id="all-tags" class="tag-container"></div>
+      </div>
+      <div id="tag-editor-actions">
+        <button id="tag-editor-cancel">Cancel</button>
+        <button id="tag-editor-save">Save</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
