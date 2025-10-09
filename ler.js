@@ -2563,14 +2563,25 @@ function openRendition(bookData, metadata) {
       height: '100%'
     };
 
-    if (currentBook.packaging.metadata.layout === 'pre-paginated') {
+    const isPrePaginated = currentBook.packaging.metadata.layout === 'pre-paginated';
+    if (isPrePaginated) {
       renderOptions.layout = 'pre-paginated';
-      renderOptions.spread = 'none';
     }
 
     currentRendition = currentBook.renderTo('viewer', renderOptions);
 
     currentRendition.on('relocated', (location) => {
+      // --- Manual Spread Handling for Pre-paginated Books ---
+      if (isPrePaginated) {
+        const section = currentBook.spine.get(location.start.index);
+        // For pages that are manually split, force a single page view.
+        // Otherwise, allow the rendition to automatically handle spreads.
+        if (section && section.properties && section.properties.includes('page-spread-center')) {
+          currentRendition.spread('none');
+        } else {
+          currentRendition.spread('auto');
+        }
+      }
       updateProgressIndicator();
       saveLastLocation();
     });
