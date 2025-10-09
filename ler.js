@@ -32,6 +32,7 @@ let currentUtterance = null;
 let isAutoReading = false;
 let isSelectionModeActive = false;
 let selectedBookIds = new Set();
+let forceSimpleNext = true;
 
 function showControls() {
   const controls = document.getElementById('reader-controls');
@@ -1157,28 +1158,22 @@ async function nextEpubPage() {
   if (!currentRendition) return;
 
   let setFinished = false;
-  let atSectionEnd = false;
-  if (currentRendition.location) {
-    const { end } = currentRendition.location;
-    atSectionEnd = (end.displayed.page >= end.displayed.total);
-  }
+  const prelocation = currentRendition.currentLocation();
+  const preStart = prelocation.start;
+  const preEnd = prelocation.end;
+  await currentRendition.next();
+  const { start, end } = currentRendition.currentLocation();
 
-  let promise;
-  if (atSectionEnd) {
+  if (preStart.cfi === start.cfi && preEnd.cfi === end.cfi) {
     const currentSection = currentRendition.manager.views.last().section;
     const nextSection = currentSection.next();
     if (nextSection) {
-      promise = currentRendition.display(nextSection.href);
+      await currentRendition.display(nextSection.href);
     } else {
       setFinished = true;
     }
-  } else {
-    promise = currentRendition.next();
   }
 
-  if (promise) {
-    await promise;
-  }
   await saveLastLocation(setFinished);
 }
 
