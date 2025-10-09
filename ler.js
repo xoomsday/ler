@@ -1732,10 +1732,189 @@ async function downloadBook(bookId) {
   }
 }
 
+async function exportAsEpub(bookId) {
+  const notification = document.createElement('div');
+  notification.id = 'toast-notification';
+  notification.textContent = 'Starting EPub export. This may take a moment...';
+  document.body.appendChild(notification);
+
+  try {
+    // 1. Get Book Data and Metadata
+    const book = await getFromDB(STORE_BOOKS_NAME, bookId);
+    const metadata = await getFromDB(STORE_METADATA_NAME, bookId) || {};
+    if (!book || !book.data) {
+      throw new Error('Book data not found.');
+    }
+    const bookName = book.name.replace(/\.cbz$/i, "");
+
+    // 2. Read CBZ and User Settings
+    const zip = await JSZip.loadAsync(book.data);
+    const imageFiles = Object.values(zip.files).filter(file =>
+      !file.dir && /\.(jpe?g|png|gif|webp)$/i.test(file.name)
+    ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    const pageDirection = (metadata && metadata.direction === 'ltr') ? 'ltr' : 'rtl';
+    const soloExceptions = new Set(metadata.soloPageExceptions || []);
+
+    const epubZip = new JSZip();
+
+    // 3. Generate EPUB Structure
+    // a. mimetype file (must be first and uncompressed)
+    epubZip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
+
+    // b. META-INF/container.xml
+    const containerXml = `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`;
+    epubZip.file('META-INF/container.xml', containerXml);
+
+    const imageItems = [];
+    const xhtmlItems = [];
+    const spineItems = [];
+    const tocItems = [];
+
+    // c. Process images and create XHTML files
+    for (let i = 0; i < imageFiles.length; i++) {
+      const imageFile = imageFiles[i];
+      const pageNum = i + 1;
+      const imageExt = imageFile.name.split('.').pop();
+      const imageMime = `image/${imageExt === 'jpg' ? 'jpeg' : imageExt}`;
+      const imagePath = `OEBPS/Images/page_${pageNum}.${imageExt}`;
+      const xhtmlPath = `OEBPS/Text/page_${pageNum}.xhtml`;
+
+      // Add items for manifest
+      imageItems.push(`<item id="img_${pageNum}" href="Images/page_${pageNum}.${imageExt}" media-type="${imageMime}"/>`);
+      xhtmlItems.push(`<item id="page_${pageNum}" href="Text/page_${pageNum}.xhtml" media-type="application/xhtml+xml"/>`);
+
+      // Add item for spine
+      spineItems.push(`<itemref idref="page_${pageNum}" />`);
+
+      // Add item for TOC
+      tocItems.push(`<navPoint id="navpoint-${pageNum}" playOrder="${pageNum}">
+        <navLabel><text>Page ${pageNum}</text></navLabel>
+        <content src="Text/page_${pageNum}.xhtml"/>
+      </navPoint>`);
+
+      // Add image file to the new zip
+      const imageBlob = await imageFile.async('blob');
+      epubZip.file(imagePath, imageBlob);
+
+      // Create and add XHTML file
+      const xhtmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en">
+<head>
+  <title>Page ${pageNum}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    body {
+      padding: 20px;
+    }
+    .img-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <div class="img-container">
+    <img src="../Images/page_${pageNum}.${imageExt}" alt="Page ${pageNum}"/>
+  </div>
+</body>
+</html>`;
+      epubZip.file(xhtmlPath, xhtmlContent);
+    }
+
+    // d. OEBPS/content.opf
+    const contentOpf = `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="book-id" version="3.0" prefix="rendition: http://www.idpf.org/2013/rendition/">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>${bookName}</dc:title>
+    <dc:creator>LER Export</dc:creator>
+    <dc:language>en</dc:language>
+    <meta property="rendition:layout">pre-paginated</meta>
+    <meta property="rendition:orientation">auto</meta>
+    <meta property="rendition:spread">auto</meta>
+    <meta name="cover" content="img_1" />
+  </metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    ${xhtmlItems.join('\n    ')}
+    ${imageItems.join('\n    ')}
+  </manifest>
+  <spine toc="ncx" page-progression-direction="${pageDirection}">
+    ${spineItems.join('\n    ')}
+  </spine>
+</package>`;
+    epubZip.file('OEBPS/content.opf', contentOpf);
+
+    // e. OEBPS/toc.ncx
+    const tocNcx = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd">
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <head>
+    <meta name="dtb:uid" content="unknown"/>
+    <meta name="dtb:depth" content="1"/>
+    <meta name="dtb:totalPageCount" content="0"/>
+    <meta name="dtb:maxPageNumber" content="0"/>
+  </head>
+  <docTitle><text>${bookName}</text></docTitle>
+  <navMap>
+    ${tocItems.join('\n    ')}
+  </navMap>
+</ncx>`;
+    epubZip.file('OEBPS/toc.ncx', tocNcx);
+
+    // 4. Create EPUB ZIP and Trigger Download
+    const blob = await epubZip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/epub+zip'
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = bookName + ".epub";
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+
+  } catch (error) {
+    console.error('Error exporting as EPub:', error);
+    alert(`An error occurred during export: ${error.message}`);
+  } finally {
+    document.body.removeChild(notification);
+  }
+}
+
 function updateBookState(bookId, state, shouldRefresh = true) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_METADATA_NAME);
+
     const request = store.get(bookId);
 
     request.onerror = event => reject(event.target.error);
@@ -1924,6 +2103,19 @@ function displayBooks() {
         downloadLink.href = '#';
         downloadLink.textContent = 'Download';
         menuContent.appendChild(downloadLink);
+
+        if (book.type === 'cbz') {
+          const exportLink = document.createElement('a');
+          exportLink.href = '#';
+          exportLink.textContent = 'Export as EPub';
+          exportLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            exportAsEpub(book.id);
+            menuContent.classList.remove('show-menu');
+          });
+          menuContent.appendChild(exportLink);
+        }
 
         const tagLink = document.createElement('a');
         tagLink.href = '#';
@@ -2358,7 +2550,17 @@ function openRendition(bookData, metadata) {
     currentBookLocationsPromise = currentBook.locations.generate();
     currentBookDirection = currentBook.packaging.metadata.direction || 'ltr';
 
-    currentRendition = currentBook.renderTo('viewer', { width: '100%', height: '100%' });
+    const renderOptions = {
+      width: '100%',
+      height: '100%'
+    };
+
+    if (currentBook.packaging.metadata.layout === 'pre-paginated') {
+      renderOptions.layout = 'pre-paginated';
+      renderOptions.spread = 'none';
+    }
+
+    currentRendition = currentBook.renderTo('viewer', renderOptions);
 
     currentRendition.on('relocated', (location) => {
       updateProgressIndicator();

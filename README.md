@@ -74,6 +74,11 @@ the browser's IndexedDB.
     *   **Book Actions**: A hamburger menu on each tile allows you to:
         *   **Delete** the book from your library.
         *   **Download** the book file (EPUB or CBZ) to your device.
+        *   **Export as EPub**: For CBZ files, this option converts the
+          comic into a standards-compliant, pre-paginated EPUB 3 file.
+          The conversion respects the user's saved settings for page
+          progression direction (LTR/RTL) and any manual spread
+          splits.
         *   **Reset the state** manually to Unread, Reading, or
           Finished.
     *   **Local Storage**: Book files and user metadata are stored
