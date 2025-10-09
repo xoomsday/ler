@@ -1785,9 +1785,17 @@ async function exportAsEpub(bookId) {
       const imagePath = `OEBPS/Images/page_${pageNum}.${imageExt}`;
       const xhtmlPath = `OEBPS/Text/page_${pageNum}.xhtml`;
 
+      // --- Spread Properties (EPUB 3) ---
+      const properties = ['rendition-layout-pre-paginated'];
+      // For manually split pages, force them to be centered
+      if (soloExceptions.has(i)) { // 'i' is the 0-based index
+        properties.push('page-spread-center');
+      }
+      const propertiesString = properties.join(' ');
+
       // Add items for manifest
       imageItems.push(`<item id="img_${pageNum}" href="Images/page_${pageNum}.${imageExt}" media-type="${imageMime}"/>`);
-      xhtmlItems.push(`<item id="page_${pageNum}" href="Text/page_${pageNum}.xhtml" media-type="application/xhtml+xml"/>`);
+      xhtmlItems.push(`<item id="page_${pageNum}" href="Text/page_${pageNum}.xhtml" media-type="application/xhtml+xml" properties="${propertiesString}"/>`);
 
       // Add item for spine
       spineItems.push(`<itemref idref="page_${pageNum}" />`);
