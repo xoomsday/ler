@@ -55,10 +55,22 @@ the browser's IndexedDB.
         *   **Reading**: A book you have started reading.
         *   **Finished**: A book you have read to the end.
     *   **Filtering and Sorting**:
-        *   Filter your library to show any combination of states
-          (e.g., only "Reading" and "Finished" books).
+        *   Filter your library by any combination of states (e.g.,
+          only "Reading" and "Finished" books) or by tags.
         *   Sort books by title (with version-aware sorting for series)
           or by the last time they were read.
+    *   **Tagging System**:
+        *   Create, edit, and delete tags.
+        *   Assign multiple tags to a book.
+        *   Filter the library by one or more tags.
+    *   **Bulk Operations**:
+        *   Enter a "selection mode" by long-pressing on a book.
+        *   Select multiple books to perform actions on them
+          simultaneously.
+        *   Bulk delete selected books.
+        *   Bulk change the reading state (Unread, Reading, Finished)
+          of selected books.
+        *   Bulk add/remove tags to selected books.
     *   **Book Actions**: A hamburger menu on each tile allows you to:
         *   **Delete** the book from your library.
         *   **Download** the book file (EPUB or CBZ) to your device.
@@ -97,10 +109,17 @@ the browser's IndexedDB.
         *   **Intuitive Display Controls**: Font size, line height, and
           font face are managed with "pill" shaped controls that always
           show the current value.
+        *   **Progress Indicator**: A progress indicator is now
+          displayed, showing the current page number and total pages
+          for CBZ files, and the percentage completed for EPUB files.
         *   **Dynamic Help**: A help screen showing keyboard shortcuts
           can be brought up at any time by pressing the `?` key. The
           content of this screen is context-aware, showing only the
           shortcuts relevant to the current view (EPUB or CBZ).
+    *   **Text-to-Speech (TTS)**:
+        *   Read the current page's text aloud.
+        *   Play, pause, and stop controls for TTS.
+        *   Automatically turns to the next page and continues reading.
     *   **Keyboard Navigation**:
         *   **For All Views**:
             *   `ArrowLeft` / `ArrowRight`: Navigate between pages.
