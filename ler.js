@@ -604,13 +604,20 @@ function updateProgressIndicator() {
       indicator.textContent = '';
     }
   } else { // epub
-    if (currentBook && currentBook.locations && currentRendition && currentRendition.currentLocation()) {
+    if (currentBook && currentBook.locations &&
+	currentRendition && currentRendition.currentLocation()) {
       const location = currentRendition.currentLocation();
       const percentage = currentBook.locations.percentageFromCfi(location.start.cfi);
       if (percentage !== null && !isNaN(percentage)) {
         indicator.textContent = `(${(percentage * 100).toFixed(0)}%)`;
       } else {
-        indicator.textContent = '';
+	try {
+	  const pos = location.start.index;
+	  const len = currentBook.locations.spine.items.length;
+	  indicator.textContent = `(${pos + 1}/${len})`;
+	} catch (e) {
+          indicator.textContent = '';
+	}
       }
     } else {
       indicator.textContent = '';
@@ -686,10 +693,19 @@ async function saveLastLocation(setFinished) {
 
       let progress = null;
       const locations = currentBook.locations;
-      const cfi = currentRendition.currentLocation().start.cfi;
+      const location = currentRendition.currentLocation();
+      const cfi = location.start.cfi;
       const locationIndex = locations.locationFromCfi(cfi);
       if (locationIndex !== -1 && locations.total > 0) {
         progress = locationIndex / locations.total;
+      } else {
+	try {
+	  const pos = location.start.index;
+	  const len = locations.spine.items.length;
+	  progress = pos / len;
+	} catch (e) {
+	  progress = null;
+	}
       }
 
       return new Promise((resolve, reject) => {
