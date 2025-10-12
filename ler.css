@@ -150,6 +150,11 @@ h1 {
   object-fit: contain;
 }
 
+.book-cover img.lazy {
+  background-color: #e0e0e0;
+  transition: opacity 0.3s;
+}
+
 .state-overlay {
   position: absolute;
   top: 0;

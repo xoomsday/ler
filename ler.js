@@ -33,6 +33,21 @@ let isAutoReading = false;
 let isSelectionModeActive = false;
 let selectedBookIds = new Set();
 let forceSimpleNext = true;
+let coverObserver = null;
+
+function setupCoverObserver() {
+  coverObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        img.src = img.dataset.src;
+        img.classList.remove('lazy');
+        observer.unobserve(img);
+      }
+    });
+  }, { rootMargin: "0px 0px 100px 0px" }); // Start loading when 100px away from viewport
+}
+
 
 function showControls() {
   const controls = document.getElementById('reader-controls');
@@ -471,6 +486,7 @@ window.addEventListener('load', async () => {
       addNewTagFromInput();
     }
   });
+  setupCoverObserver();
 });
 
 async function populateTagFilter() {
@@ -2234,8 +2250,10 @@ function displayBooks() {
         if (book.coverImage instanceof Blob) {
           const imageUrl = URL.createObjectURL(book.coverImage);
           const img = document.createElement('img');
-          img.src = imageUrl;
+          img.dataset.src = imageUrl;
+          img.classList.add('lazy');
           cover.appendChild(img);
+          coverObserver.observe(img);
         } else {
           const bookInstance = ePub(book.data);
           bookInstance.coverUrl().then(async (url) => {
@@ -2256,8 +2274,10 @@ function displayBooks() {
 
               const imageUrl = URL.createObjectURL(blob);
               const img = document.createElement('img');
-              img.src = imageUrl;
+              img.dataset.src = imageUrl;
+              img.classList.add('lazy');
               cover.appendChild(img);
+              coverObserver.observe(img);
             } else {
               cover.textContent = 'No cover';
             }
