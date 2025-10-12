@@ -1759,6 +1759,26 @@ async function exportAsEpub(bookId) {
   notification.textContent = 'Starting EPub export. This may take a moment...';
   document.body.appendChild(notification);
 
+  // Helper to get image dimensions
+  const getImageDimensions = (imageFile) => {
+    return new Promise((resolve, reject) => {
+      if (!imageFile) return resolve({ width: 0, height: 0 });
+      imageFile.async('blob').then(blob => {
+        const img = new Image();
+        const url = URL.createObjectURL(blob);
+        img.onload = () => {
+          resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          URL.revokeObjectURL(url);
+        };
+        img.onerror = () => {
+          reject(new Error('Could not load image dimensions'));
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      });
+    });
+  };
+
   try {
     // 1. Get Book Data and Metadata
     const book = await getFromDB(STORE_BOOKS_NAME, bookId);
@@ -1774,9 +1794,12 @@ async function exportAsEpub(bookId) {
       !file.dir && /\.(jpe?g|png|gif|webp)$/i.test(file.name)
     ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
+    if (imageFiles.length === 0) {
+      throw new Error("No images found in the CBZ file.");
+    }
+
     const pageDirection = (metadata && metadata.direction === 'ltr') ? 'ltr' : 'rtl';
     const soloExceptions = new Set(metadata.soloPageExceptions || []);
-
     const epubZip = new JSZip();
 
     // 3. Generate EPUB Structure
@@ -1792,40 +1815,65 @@ async function exportAsEpub(bookId) {
 </container>`;
     epubZip.file('META-INF/container.xml', containerXml);
 
+    // Determine viewport from the first page
+    const firstPageDimensions = await getImageDimensions(imageFiles[0]);
+    const viewBoxWidth = firstPageDimensions.width;
+    const viewBoxHeight = firstPageDimensions.height;
+
+    // c. OEBPS/Text/style.css
+    const styleCss = `
+body {
+    color: #000;
+    background: #FFF;
+    top: 0;
+    left: 0;
+    margin: 0;
+    padding: 0;
+    width: ${viewBoxWidth}px;
+    height: ${viewBoxHeight}px;
+    text-align: center;
+}
+img {
+  position: absolute;
+  margin:0;
+  padding:0;
+  z-index:0;
+  object-fit: contain;
+}`;
+    epubZip.file('OEBPS/Text/style.css', styleCss);
+
     const imageItems = [];
     const xhtmlItems = [];
     const spineItems = [];
-    const tocItems = [];
+    const tocListItems = [];
 
-    // c. Process images and create XHTML files
+    // d. Process images and create XHTML files
     for (let i = 0; i < imageFiles.length; i++) {
       const imageFile = imageFiles[i];
       const pageNum = i + 1;
-      const imageExt = imageFile.name.split('.').pop();
+      const imageExt = imageFile.name.split('.').pop().toLowerCase();
       const imageMime = `image/${imageExt === 'jpg' ? 'jpeg' : imageExt}`;
       const imagePath = `OEBPS/Images/page_${pageNum}.${imageExt}`;
       const xhtmlPath = `OEBPS/Text/page_${pageNum}.xhtml`;
 
-      // --- Spread Properties (EPUB 3) ---
-      const properties = ['rendition-layout-pre-paginated'];
-      // For manually split pages, force them to be centered
-      if (soloExceptions.has(i)) { // 'i' is the 0-based index
-        properties.push('page-spread-center');
-      }
-      const propertiesString = properties.join(' ');
+      const dimensions = await getImageDimensions(imageFile);
+      const topOffset = (viewBoxHeight - dimensions.height) / 2;
+      const leftOffset = (viewBoxWidth - dimensions.width) / 2;
 
       // Add items for manifest
       imageItems.push(`<item id="img_${pageNum}" href="Images/page_${pageNum}.${imageExt}" media-type="${imageMime}"/>`);
-      xhtmlItems.push(`<item id="page_${pageNum}" href="Text/page_${pageNum}.xhtml" media-type="application/xhtml+xml" properties="${propertiesString}"/>`);
+      xhtmlItems.push(`<item id="page_${pageNum}" href="Text/page_${pageNum}.xhtml" media-type="application/xhtml+xml"/>`);
 
       // Add item for spine
-      spineItems.push(`<itemref idref="page_${pageNum}" />`);
+      let spineItem = `<itemref idref="page_${pageNum}"`;
+      if (soloExceptions.has(i)) { // 'i' is the 0-based index
+        spineItem += ` properties="rendition:page-spread-center"`;
+      }
+      spineItem += ` />`;
+      spineItems.push(spineItem);
 
       // Add item for TOC
-      tocItems.push(`<navPoint id="navpoint-${pageNum}" playOrder="${pageNum}">
-        <navLabel><text>Page ${pageNum}</text></navLabel>
-        <content src="Text/page_${pageNum}.xhtml"/>
-      </navPoint>`);
+      tocListItems.push(`<li><a href="Text/page_${pageNum}.xhtml">Page ${pageNum}</a></li>`);
 
       // Add image file to the new zip
       const imageBlob = await imageFile.async('blob');
@@ -1837,81 +1885,64 @@ async function exportAsEpub(bookId) {
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en">
 <head>
   <title>Page ${pageNum}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-      box-sizing: border-box;
-    }
-    body {
-      padding: 20px;
-    }
-    .img-container {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-    }
-  </style>
+  <link href="style.css" type="text/css" rel="stylesheet"/>
+  <meta name="viewport" content="width=${viewBoxWidth}, height=${viewBoxHeight}"/>
 </head>
 <body>
-  <div class="img-container">
-    <img src="../Images/page_${pageNum}.${imageExt}" alt="Page ${pageNum}"/>
-  </div>
+  <img src="../Images/page_${pageNum}.${imageExt}" alt="Page ${pageNum}" style="width:${dimensions.width}px; height:${dimensions.height}px; top:${topOffset}px; left:${leftOffset}px;"/>
 </body>
 </html>`;
       epubZip.file(xhtmlPath, xhtmlContent);
     }
 
-    // d. OEBPS/content.opf
+    const now_iso = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+    // e. OEBPS/content.opf
     const contentOpf = `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" unique-identifier="book-id" version="3.0" prefix="rendition: http://www.idpf.org/2013/rendition/">
-  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
     <dc:title>${bookName}</dc:title>
     <dc:creator>LER Export</dc:creator>
     <dc:language>en</dc:language>
+    <dc:identifier id="book-id">urn:uuid:${crypto.randomUUID()}</dc:identifier>
+    <meta property="dcterms:modified">${now_iso}</meta>
     <meta property="rendition:layout">pre-paginated</meta>
     <meta property="rendition:orientation">auto</meta>
     <meta property="rendition:spread">auto</meta>
     <meta name="cover" content="img_1" />
+    <opf:meta name="fixed-layout" content="true"/>
+    <opf:meta name="original-resolution" content="${viewBoxWidth}x${viewBoxHeight}"/>
   </metadata>
   <manifest>
-    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="css" href="Text/style.css" media-type="text/css"/>
     ${xhtmlItems.join('\n    ')}
     ${imageItems.join('\n    ')}
   </manifest>
-  <spine toc="ncx" page-progression-direction="${pageDirection}">
+  <spine page-progression-direction="${pageDirection}">
     ${spineItems.join('\n    ')}
   </spine>
 </package>`;
     epubZip.file('OEBPS/content.opf', contentOpf);
 
-    // e. OEBPS/toc.ncx
-    const tocNcx = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd">
-<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+    // f. OEBPS/toc.xhtml
+    const tocXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
   <head>
-    <meta name="dtb:uid" content="unknown"/>
-    <meta name="dtb:depth" content="1"/>
-    <meta name="dtb:totalPageCount" content="0"/>
-    <meta name="dtb:maxPageNumber" content="0"/>
+    <title>${bookName}</title>
   </head>
-  <docTitle><text>${bookName}</text></docTitle>
-  <navMap>
-    ${tocItems.join('\n    ')}
-  </navMap>
-</ncx>`;
-    epubZip.file('OEBPS/toc.ncx', tocNcx);
+  <body>
+    <nav epub:type="toc" id="toc">
+      <h2>${bookName}</h2>
+      <ol>
+        ${tocListItems.join('\n        ')}
+      </ol>
+    </nav>
+  </body>
+</html>`;
+    epubZip.file('OEBPS/toc.xhtml', tocXhtml);
+
 
     // 4. Create EPUB ZIP and Trigger Download
     const blob = await epubZip.generateAsync({
