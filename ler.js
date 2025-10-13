@@ -1270,7 +1270,6 @@ async function handleEpubKeyPress(event) {
       resetFontSettings();
       break;
     case 'f':
-    case 's':
       toggleFont();
       break;
     case 'd':
@@ -1281,6 +1280,9 @@ async function handleEpubKeyPress(event) {
       break;
     case 'b':
       addNewBookmark();
+      break;
+    case '.':
+      showControls();
       break;
     case '?':
       const helpOverlay = document.getElementById('help-overlay');
@@ -1307,6 +1309,9 @@ async function handleCbzKeyPress(event) {
       break;
     case 's':
       toggleSpread();
+      break;
+    case '.':
+      showControls();
       break;
     case '?':
       const helpOverlay = document.getElementById('help-overlay');
@@ -1339,7 +1344,7 @@ function generateHelpContent(bookType) {
       { key: '→', description: 'Next page' },
       { key: '↑', description: 'Increase font size' },
       { key: '↓', description: 'Decrease font size' },
-      { key: 's', description: 'Toggle font (serif/sans-serif)' },
+      { key: 'f', description: 'Toggle font (serif/sans-serif)' },
       { key: 'd', description: 'Toggle dark mode' },
       { key: 'm', description: 'Toggle TOC/Bookmark' },
       { key: 'b', description: 'Add/remove bookmark' },

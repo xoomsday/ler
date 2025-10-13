@@ -133,7 +133,7 @@ the browser's IndexedDB.
             *   `ArrowUp` / `+` / `=`: Increase the font size.
             *   `ArrowDown` / `-` / `_`: Decrease the font size.
             *   `[` / `]`: Increase or decrease the line spacing.
-            *   `s`: Toggle font (**s**erif/sans-serif).
+            *   `f`: Toggle **f**ont (serif/sans-serif).
             *   `d`: Toggle **d**ark mode.
             *   `m`: Toggle TOC/**m**enu overlay.
             *   `b`: Add **b**ookmark at current location.
