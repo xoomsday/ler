@@ -34,6 +34,9 @@ let isSelectionModeActive = false;
 let selectedBookIds = new Set();
 let forceSimpleNext = true;
 let coverObserver = null;
+let currentBookOffset = 0;
+const BOOKS_PER_PAGE = 20;
+let isLoadingBooks = false;
 
 function setupCoverObserver() {
   coverObserver = new IntersectionObserver((entries, observer) => {
@@ -45,7 +48,18 @@ function setupCoverObserver() {
         observer.unobserve(img);
       }
     });
-  }, { rootMargin: "0px 0px 100px 0px" }); // Start loading when 100px away from viewport
+  });
+}
+
+function setupScrollObserver() {
+  const trigger = document.getElementById('infinite-scroll-trigger');
+  const scrollObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && !isLoadingBooks) {
+      isLoadingBooks = true;
+      displayBooks(true); // Pass true to append books
+    }
+  }, { threshold: 0.1 });
+  scrollObserver.observe(trigger);
 }
 
 
@@ -487,6 +501,7 @@ window.addEventListener('load', async () => {
     }
   });
   setupCoverObserver();
+  setupScrollObserver();
 });
 
 async function populateTagFilter() {
@@ -2022,11 +2037,16 @@ function updateBookState(bookId, state, shouldRefresh = true) {
 
 
 
-function displayBooks() {
+function displayBooks(append = false) {
   const bookGrid = document.getElementById('book-grid');
-  while (bookGrid.firstChild) {
-    bookGrid.removeChild(bookGrid.firstChild);
+  if (!append) {
+    currentBookOffset = 0;
+    while (bookGrid.firstChild) {
+      bookGrid.removeChild(bookGrid.firstChild);
+    }
   }
+  isLoadingBooks = true;
+
 
   const transaction = db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME, STORE_BOOK_TAGS_NAME], 'readonly');
   const store = transaction.objectStore(STORE_BOOKS_NAME);
@@ -2091,12 +2111,15 @@ function displayBooks() {
         });
       }
 
-      if (filteredBooks.length === 0) {
+      const booksToDisplay = filteredBooks.slice(currentBookOffset, currentBookOffset + BOOKS_PER_PAGE);
+
+      if (booksToDisplay.length === 0 && currentBookOffset === 0) {
         bookGrid.innerHTML = '<p>No books match the current filters.</p>';
+        isLoadingBooks = false;
         return;
       }
 
-      filteredBooks.forEach((book) => {
+      booksToDisplay.forEach((book) => {
         const tile = document.createElement('div');
         tile.className = 'book-tile';
         tile.dataset.bookId = book.id;
@@ -2284,6 +2307,8 @@ function displayBooks() {
           });
         }
       });
+      currentBookOffset += booksToDisplay.length;
+      isLoadingBooks = false;
     };
   };
 
