@@ -1879,6 +1879,14 @@ img {
     const tocListItems = [];
 
     // d. Process images and create XHTML files
+    var side1 = 'right';
+    var side2 = 'left';
+    if (pageDirection === 'ltr') {
+      side1 = 'left';
+      side2 = 'right';
+    }
+    var side = side2;
+
     for (let i = 0; i < imageFiles.length; i++) {
       const imageFile = imageFiles[i];
       const pageNum = i + 1;
@@ -1898,8 +1906,11 @@ img {
       // Add item for spine
       let spineItem = `<itemref idref="page_${pageNum}"`;
       if (soloExceptions.has(i)) { // 'i' is the 0-based index
-        spineItem += ` properties="rendition:page-spread-center"`;
+        side = side2;
       }
+      spineItem += ` properties="rendition:page-spread-${side}"`;
+      side = (side === side1) ? side2 : side1;
+
       spineItem += ` />`;
       spineItems.push(spineItem);
 
