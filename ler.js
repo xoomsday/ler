@@ -671,7 +671,8 @@ async function closeReader() {
   document.getElementById('reader-view').style.display = 'none';
   document.getElementById('viewer').innerHTML = '';
   document.getElementById('progress-indicator').style.display = 'none';
-  document.getElementById('book-management').style.display = 'block';
+  document.body.style.overflow = ''; // Restore scrolling for the main view
+  document.getElementById('book-management').style.display = 'flex'; // Restore flex display
   document.getElementById('help-overlay').style.display = 'none';
 
   // Reset comic book specific things

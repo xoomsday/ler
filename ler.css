@@ -1,12 +1,21 @@
 /* LER stylesheet */
 
-body {
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevent body from scrolling */
   font-family: sans-serif;
-  margin: 2em;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
 }
 
 h1 {
   text-align: center;
+  margin: 0.5em 0;
 }
 
 #book-management {
@@ -35,12 +44,17 @@ h1 {
   max-width: 100%;
   border: none;
   padding: 0;
-  height: 100vh;
   display: flex;
   flex-direction: column;
+  flex-grow: 1; /* Allow this to take up remaining space */
+  overflow: hidden; /* Important for containing the sticky pane */
 }
 
 #top-pane {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 2;
   padding: 0.5em;
   border-bottom: 1px solid #ccc;
   display: flex;

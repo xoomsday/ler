@@ -11,6 +11,10 @@ body.dark-mode {
   color: #e0e0e0;
 }
 
+.dark-mode #top-pane {
+  background-color: #121212;
+}
+
 .dark-mode .button-like-label,
 .dark-mode #reader-controls button,
 .dark-mode #sorting select {
