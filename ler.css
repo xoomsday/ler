@@ -340,8 +340,38 @@ h1 {
   padding: 0.25em;
   border-radius: 0 0 5px 5px;
   display: flex;
+  flex-direction: column; /* Changed to column */
+  gap: 0.5em; /* Added gap for spacing */
+}
+
+#top-reader-controls {
+  display: flex;
   align-items: center;
   gap: 1em;
+  width: 100%;
+}
+
+#progress-slider-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#progress-slider {
+  width: 100%;
+  margin: 0;
+}
+
+#progress-labels {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 0.8em;
+  color: #555;
+  padding: 0 0.2em;
+}
+
+#reader-view[data-direction="rtl"] #progress-slider {
+  transform: scaleX(-1);
 }
 
 #reader-controls.controls-hidden,

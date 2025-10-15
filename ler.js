@@ -677,6 +677,7 @@ async function closeReader() {
 
   // Reset comic book specific things
   readerView.classList.remove('comic-mode');
+  readerView.removeAttribute('data-direction');
   comicBookPages = [];
   currentComicPage = 0;
 
@@ -2437,15 +2438,27 @@ async function openComicBook(bookRecord, metadata) {
   if (metadata && metadata.direction) {
     currentBookDirection = metadata.direction;
   } else {
-    currentBookDirection = directionFromComicInfo;
-  }
+        currentBookDirection = directionFromComicInfo;
+      }
 
-  updateDirectionButton();
+      document.getElementById('reader-view').dataset.direction = currentBookDirection;
+      updateDirectionButton();
 
+      const slider = document.getElementById('progress-slider');
+      const currentLabel = document.getElementById('progress-current-label');
+  const totalLabel = document.getElementById('progress-total-label');
+
+  slider.addEventListener('input', () => {
+    const pageNum = parseInt(slider.value, 10);
+    displayComicPage(pageNum);
+  });
 
   comicBookPages = Object.values(zip.files).filter(file =>
     !file.dir && /\.(jpe?g|png|gif|webp)$/i.test(file.name)
   ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+  slider.max = comicBookPages.length - 1;
+  totalLabel.textContent = comicBookPages.length;
 
   // Now that comicBookPages is populated, resolve filenames to indices for comicInfoPageLayouts
   const resolvedComicInfoPageLayouts = new Map();
@@ -2468,6 +2481,11 @@ async function displayComicPage(pageNumber) {
   if (pageNumber < 0 || pageNumber >= comicBookPages.length) {
     return;
   }
+  const slider = document.getElementById('progress-slider');
+  const currentLabel = document.getElementById('progress-current-label');
+  slider.value = pageNumber;
+  currentLabel.textContent = pageNumber + 1;
+
   currentComicPage = pageNumber;
   const viewer = document.getElementById('viewer');
   viewer.innerHTML = ''; // Clear previous content
@@ -2666,6 +2684,7 @@ function openRendition(bookData, metadata) {
   currentBook.ready.then(async () => {
     currentBookLocationsPromise = currentBook.locations.generate();
     currentBookDirection = currentBook.packaging.metadata.direction || 'ltr';
+    document.getElementById('reader-view').dataset.direction = currentBookDirection;
 
     const renderOptions = {
       width: '100%',
@@ -2679,7 +2698,20 @@ function openRendition(bookData, metadata) {
 
     currentRendition = currentBook.renderTo('viewer', renderOptions);
 
+    const slider = document.getElementById('progress-slider');
+    const currentLabel = document.getElementById('progress-current-label');
+    const totalLabel = document.getElementById('progress-total-label');
+
+    slider.addEventListener('input', () => {
+      const cfi = currentBook.locations.cfiFromLocation(slider.value);
+      currentRendition.display(cfi);
+      currentLabel.textContent = slider.value;
+    });
+
     currentRendition.on('relocated', (location) => {
+      const currentLocation = currentBook.locations.locationFromCfi(location.start.cfi);
+      slider.value = currentLocation;
+      currentLabel.textContent = currentLocation;
       // --- Manual Spread Handling for Pre-paginated Books ---
       if (isPrePaginated) {
         const section = currentBook.spine.get(location.start.index);
@@ -2718,6 +2750,11 @@ function openRendition(bookData, metadata) {
     } else {
       await currentRendition.display();
     }
+
+    await currentBookLocationsPromise; // Ensure locations are generated
+    slider.max = currentBook.locations.total - 1;
+    totalLabel.textContent = currentBook.locations.total - 1;
+
     await saveLastLocation();
   });
 }
