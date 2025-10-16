@@ -108,8 +108,9 @@ function extractReadableText(bodyElement) {
     // Replace the ruby element with a text node containing the pronunciation
     if (pronunciation) {
       ruby.parentNode
-      .replaceChild(bodyElement.ownerDocument.createTextNode(pronunciation), ruby);
-    }  });
+        .replaceChild(bodyElement.ownerDocument.createTextNode(pronunciation), ruby);
+    }
+  });
   return clonedBody.textContent;
 }
 
@@ -146,7 +147,7 @@ async function getCurrentPageText() {
       const doc1 = startRange.startContainer.ownerDocument;
       const range1 = doc1.createRange();
       range1.setStart(startRange.startContainer, startRange.startOffset);
-      range1.setEnd(doc1.body, doc1.body.childNodes.length); // Go to the end of the first document
+      range1.setEnd(doc1.body, doc1.body.childNodes.length);
       const fragment1 = range1.cloneContents();
       const div1 = document.createElement('div');
       div1.appendChild(fragment1);
@@ -300,16 +301,22 @@ function initDB() {
         db.createObjectStore(STORE_METADATA_NAME, { keyPath: 'bookId' });
       }
       if (!db.objectStoreNames.contains(STORE_BOOKMARKS_NAME)) {
-        const bookmarksStore = db.createObjectStore(STORE_BOOKMARKS_NAME, { keyPath: 'id', autoIncrement: true });
+        const bookmarksStore =
+              db.createObjectStore(STORE_BOOKMARKS_NAME,
+                                   { keyPath: 'id', autoIncrement: true });
         bookmarksStore.createIndex('by_bookId', 'bookId', { unique: false });
       }
       if (event.oldVersion < 4) {
         if (!db.objectStoreNames.contains(STORE_TAGS_NAME)) {
-          const tagsStore = db.createObjectStore(STORE_TAGS_NAME, { keyPath: 'id', autoIncrement: true });
+          const tagsStore =
+                db.createObjectStore(STORE_TAGS_NAME,
+                                     { keyPath: 'id', autoIncrement: true });
           tagsStore.createIndex('by_name', 'name', { unique: true });
         }
         if (!db.objectStoreNames.contains(STORE_BOOK_TAGS_NAME)) {
-          const bookTagsStore = db.createObjectStore(STORE_BOOK_TAGS_NAME, { keyPath: 'id', autoIncrement: true });
+          const bookTagsStore =
+                db.createObjectStore(STORE_BOOK_TAGS_NAME,
+                                     { keyPath: 'id', autoIncrement: true });
           bookTagsStore.createIndex('by_bookId', 'bookId', { unique: false });
           bookTagsStore.createIndex('by_tagId', 'tagId', { unique: false });
         }
@@ -329,48 +336,48 @@ function initDB() {
 }
 
 async function migrateBookmarksFromLocalStorage() {
-    const bookmarksJSON = localStorage.getItem('ler-bookmarks');
-    if (!bookmarksJSON) {
-        return; // Nothing to migrate
-    }
+  const bookmarksJSON = localStorage.getItem('ler-bookmarks');
+  if (!bookmarksJSON) {
+    return; // Nothing to migrate
+  }
 
-    const bookmarks = JSON.parse(bookmarksJSON);
-    const bookIds = Object.keys(bookmarks);
+  const bookmarks = JSON.parse(bookmarksJSON);
+  const bookIds = Object.keys(bookmarks);
 
-    if (bookIds.length === 0) {
-        localStorage.removeItem('ler-bookmarks');
-        return;
-    }
+  if (bookIds.length === 0) {
+    localStorage.removeItem('ler-bookmarks');
+    return;
+  }
 
-    const transaction = db.transaction([STORE_BOOKMARKS_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_BOOKMARKS_NAME);
+  const transaction = db.transaction([STORE_BOOKMARKS_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_BOOKMARKS_NAME);
 
-    bookIds.forEach(bookId => {
-        const bookBookmarks = bookmarks[bookId];
-        bookBookmarks.forEach(bookmark => {
-            const numericBookId = parseInt(bookId, 10);
-            if (!isNaN(numericBookId)) {
-                store.add({
-                    bookId: numericBookId,
-                    cfi: bookmark.cfi,
-                    text: bookmark.text,
-                    created: bookmark.created
-                });
-            }
+  bookIds.forEach(bookId => {
+    const bookBookmarks = bookmarks[bookId];
+    bookBookmarks.forEach(bookmark => {
+      const numericBookId = parseInt(bookId, 10);
+      if (!isNaN(numericBookId)) {
+        store.add({
+          bookId: numericBookId,
+          cfi: bookmark.cfi,
+          text: bookmark.text,
+          created: bookmark.created
         });
+      }
     });
+  });
 
-    return new Promise((resolve, reject) => {
-        transaction.oncomplete = () => {
-            console.log('Bookmarks migrated successfully.');
-            localStorage.removeItem('ler-bookmarks');
-            resolve();
-        };
-        transaction.onerror = (event) => {
-            console.error('Error migrating bookmarks:', event.target.error);
-            reject(event.target.error);
-        };
-    });
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => {
+      console.log('Bookmarks migrated successfully.');
+      localStorage.removeItem('ler-bookmarks');
+      resolve();
+    };
+    transaction.onerror = (event) => {
+      console.error('Error migrating bookmarks:', event.target.error);
+      reject(event.target.error);
+    };
+  });
 }
 
 window.addEventListener('load', async () => {
@@ -409,7 +416,8 @@ window.addEventListener('load', async () => {
   document.getElementById('tts-stop').addEventListener('click', stopReading);
 
   window.addEventListener('resize', () => {
-    if (currentBookType === 'cbz' && document.getElementById('reader-view').style.display === 'block') {
+    if (currentBookType === 'cbz' &&
+        document.getElementById('reader-view').style.display === 'block') {
       displayComicPage(currentComicPage);
     }
   });
@@ -444,7 +452,8 @@ window.addEventListener('load', async () => {
   const stateFilterOptions = document.getElementById('state-filter-options');
 
   stateFilterBtn.addEventListener('click', (event) => {
-    event.stopPropagation(); // Prevent the window click listener from closing it immediately
+    // Prevent the window click listener from closing it immediately
+    event.stopPropagation();
     stateFilterOptions.classList.toggle('show');
   });
 
@@ -509,7 +518,8 @@ async function populateTagFilter() {
   optionsContainer.innerHTML = ''; // Clear existing
 
   const transaction = db.transaction([STORE_TAGS_NAME], 'readonly');
-  const tags = await new Promise(resolve => transaction.objectStore(STORE_TAGS_NAME).getAll().onsuccess = e => resolve(e.target.result));
+  const tags = await new Promise(resolve => transaction.objectStore(STORE_TAGS_NAME)
+                                 .getAll().onsuccess = e => resolve(e.target.result));
 
   tags.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -597,7 +607,8 @@ async function bulkDelete() {
   if (numSelected === 0) return;
   if (confirm(`Are you sure you want to delete ${numSelected} book(s)?`)) {
     for (const bookId of selectedBookIds) {
-      deleteBook(bookId, false); // Pass false to prevent re-displaying books each time
+      // Pass false to prevent re-displaying books each time
+      deleteBook(bookId, false);
     }
     exitSelectionMode();
     displayBooks(); // Refresh the book list once at the end
@@ -610,7 +621,8 @@ async function bulkUpdateState(event) {
 
   const promises = [];
   for (const bookId of selectedBookIds) {
-    promises.push(updateBookState(bookId, state, false)); // Pass false to prevent re-displaying
+    // Pass false to prevent re-displaying
+    promises.push(updateBookState(bookId, state, false));
   }
   await Promise.all(promises);
 
@@ -636,19 +648,19 @@ function updateProgressIndicator() {
     }
   } else { // epub
     if (currentBook && currentBook.locations &&
-	currentRendition && currentRendition.currentLocation()) {
+        currentRendition && currentRendition.currentLocation()) {
       const location = currentRendition.currentLocation();
       const percentage = currentBook.locations.percentageFromCfi(location.start.cfi);
       if (percentage !== null && !isNaN(percentage)) {
         indicator.textContent = `(${(percentage * 100).toFixed(0)}%)`;
       } else {
-	try {
-	  const pos = location.start.index;
-	  const len = currentBook.locations.spine.items.length;
-	  indicator.textContent = `(${pos + 1}/${len})`;
-	} catch (e) {
+        try {
+          const pos = location.start.index;
+          const len = currentBook.locations.spine.items.length;
+          indicator.textContent = `(${pos + 1}/${len})`;
+        } catch (e) {
           indicator.textContent = '';
-	}
+        }
       }
     } else {
       indicator.textContent = '';
@@ -671,8 +683,10 @@ async function closeReader() {
   document.getElementById('reader-view').style.display = 'none';
   document.getElementById('viewer').innerHTML = '';
   document.getElementById('progress-indicator').style.display = 'none';
-  document.body.style.overflow = ''; // Restore scrolling for the main view
-  document.getElementById('book-management').style.display = 'flex'; // Restore flex display
+  // Restore scrolling for the main view
+  document.body.style.overflow = '';
+  // Restore flex display
+  document.getElementById('book-management').style.display = 'flex';
   document.getElementById('help-overlay').style.display = 'none';
 
   // Reset comic book specific things
@@ -708,7 +722,9 @@ async function saveLastLocation(setFinished) {
         if (setFinished) {
           data.state = 'finished';
         }
-        data.progress = comicBookPages.length > 0 ? (currentComicPage + 1) / comicBookPages.length : 0;
+        data.progress = (comicBookPages.length > 0
+                         ? (currentComicPage + 1) / comicBookPages.length
+                         : 0);
         data.lastReadTimestamp = Date.now();
         store.put(data);
       };
@@ -732,13 +748,13 @@ async function saveLastLocation(setFinished) {
       if (locationIndex !== -1 && locations.total > 0) {
         progress = locationIndex / locations.total;
       } else {
-	try {
-	  const pos = location.start.index;
-	  const len = locations.spine.items.length;
-	  progress = pos / len;
-	} catch (e) {
-	  progress = null;
-	}
+        try {
+          const pos = location.start.index;
+          const len = locations.spine.items.length;
+          progress = pos / len;
+        } catch (e) {
+          progress = null;
+        }
       }
 
       return new Promise((resolve, reject) => {
@@ -757,9 +773,9 @@ async function saveLastLocation(setFinished) {
         request.onsuccess = () => {
           const data = request.result || { bookId: currentBookId };
           data.lastLocation = cfi;
-      if (setFinished) {
+          if (setFinished) {
             data.state = 'finished';
-      }
+          }
           if (Number.isFinite(progress)) {
             data.progress = progress;
           }
@@ -873,8 +889,10 @@ async function toggleFont() {
 async function applyFont() {
   if (!currentRendition) return;
   const fontToggleButton = document.getElementById('font-toggle');
-  const serifFonts = '"MS PMincho", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "serif-ja", serif';
-  const sansFonts = '"Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", "sans-serif-ja", sans-serif';
+  const serifFonts = ('"MS PMincho", "Hiragino Mincho ProN", "Yu Mincho", ' +
+                      '"YuMincho", "serif-ja", serif');
+  const sansFonts = ('"Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic",' +
+                     '"sans-serif-ja", sans-serif');
 
   if (currentFont === 'serif') {
     currentRendition.themes.override('font-family', serifFonts);
@@ -1277,84 +1295,84 @@ async function prevPage() {
 
 async function handleEpubKeyPress(event) {
   switch (event.key) {
-    case 'ArrowLeft':
-      if (currentBookDirection === 'rtl') nextEpubPage(); else prevEpubPage();
-      break;
-    case 'ArrowRight':
-      if (currentBookDirection === 'rtl') prevEpubPage(); else nextEpubPage();
-      break;
-    case 'ArrowUp':
-    case '+':
-    case '=':
-      increaseFontSize();
-      break;
-    case 'ArrowDown':
-    case '-':
-    case '_':
-      decreaseFontSize();
-      break;
-    case '[':
-      decreaseLineHeight();
-      break;
-    case ']':
-      increaseLineHeight();
-      break;
-    case '0':
-      resetFontSettings();
-      break;
-    case 'f':
-      toggleFont();
-      break;
-    case 'd':
-      toggleDarkMode();
-      break;
-    case 'm':
-      toggleToc();
-      break;
-    case 'b':
-      addNewBookmark();
-      break;
-    case '.':
-      showControls();
-      break;
-    case '?':
-      const helpOverlay = document.getElementById('help-overlay');
-      if (helpOverlay.style.display === 'none') {
-        generateHelpContent(currentBookType);
-        helpOverlay.style.display = 'block';
-      } else {
-        helpOverlay.style.display = 'none';
-      }
-      break;
+  case 'ArrowLeft':
+    if (currentBookDirection === 'rtl') nextEpubPage(); else prevEpubPage();
+    break;
+  case 'ArrowRight':
+    if (currentBookDirection === 'rtl') prevEpubPage(); else nextEpubPage();
+    break;
+  case 'ArrowUp':
+  case '+':
+  case '=':
+    increaseFontSize();
+    break;
+  case 'ArrowDown':
+  case '-':
+  case '_':
+    decreaseFontSize();
+    break;
+  case '[':
+    decreaseLineHeight();
+    break;
+  case ']':
+    increaseLineHeight();
+    break;
+  case '0':
+    resetFontSettings();
+    break;
+  case 'f':
+    toggleFont();
+    break;
+  case 'd':
+    toggleDarkMode();
+    break;
+  case 'm':
+    toggleToc();
+    break;
+  case 'b':
+    addNewBookmark();
+    break;
+  case '.':
+    showControls();
+    break;
+  case '?':
+    const helpOverlay = document.getElementById('help-overlay');
+    if (helpOverlay.style.display === 'none') {
+      generateHelpContent(currentBookType);
+      helpOverlay.style.display = 'block';
+    } else {
+      helpOverlay.style.display = 'none';
+    }
+    break;
   }
 }
 
 async function handleCbzKeyPress(event) {
   switch (event.key) {
-    case 'ArrowLeft':
-      if (currentBookDirection === 'rtl') nextCbzPage(); else prevCbzPage();
-      break;
-    case 'ArrowRight':
-      if (currentBookDirection === 'rtl') prevCbzPage(); else nextCbzPage();
-      break;
-    case 'd':
-      toggleDirection();
-      break;
-    case 's':
-      toggleSpread();
-      break;
-    case '.':
-      showControls();
-      break;
-    case '?':
-      const helpOverlay = document.getElementById('help-overlay');
-      if (helpOverlay.style.display === 'none') {
-        generateHelpContent(currentBookType);
-        helpOverlay.style.display = 'block';
-      } else {
-        helpOverlay.style.display = 'none';
-      }
-      break;
+  case 'ArrowLeft':
+    if (currentBookDirection === 'rtl') nextCbzPage(); else prevCbzPage();
+    break;
+  case 'ArrowRight':
+    if (currentBookDirection === 'rtl') prevCbzPage(); else nextCbzPage();
+    break;
+  case 'd':
+    toggleDirection();
+    break;
+  case 's':
+    toggleSpread();
+    break;
+  case '.':
+    showControls();
+    break;
+  case '?':
+    const helpOverlay = document.getElementById('help-overlay');
+    if (helpOverlay.style.display === 'none') {
+      generateHelpContent(currentBookType);
+      helpOverlay.style.display = 'block';
+    } else {
+      helpOverlay.style.display = 'none';
+    }
+    break;
   }
 }
 
@@ -1393,7 +1411,8 @@ function generateHelpContent(bookType) {
 }
 
 async function handleKeyPress(event) {
-  if (document.getElementById('reader-view').style.display !== 'block' || (!currentRendition && currentBookType !== 'cbz')) {
+  if (document.getElementById('reader-view').style.display !== 'block' ||
+      (!currentRendition && currentBookType !== 'cbz')) {
     return;
   }
   event.stopPropagation();
@@ -1461,7 +1480,8 @@ function storeBook(name, data) {
         URL.revokeObjectURL(coverUrl); // Clean up blob URL
       }
 
-      const transaction = db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME], 'readwrite');
+      const transaction =
+            db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME], 'readwrite');
       const booksStore = transaction.objectStore(STORE_BOOKS_NAME);
       const metadataStore = transaction.objectStore(STORE_METADATA_NAME);
 
@@ -1506,7 +1526,8 @@ async function storeComicBook(name, data) {
         coverImage = await resizeImageBlob(blob);
       }
 
-      const transaction = db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME], 'readwrite');
+      const transaction =
+            db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME], 'readwrite');
       const booksStore = transaction.objectStore(STORE_BOOKS_NAME);
       const metadataStore = transaction.objectStore(STORE_METADATA_NAME);
 
@@ -1625,8 +1646,12 @@ async function openTagEditor(bookId, bookName) {
   const bookTagsStore = transaction.objectStore(STORE_BOOK_TAGS_NAME);
   const bookTagsIndex = bookTagsStore.index('by_bookId');
 
-  const allTagsPromise = new Promise(resolve => tagsStore.getAll().onsuccess = e => resolve(e.target.result));
-  const bookTagsPromise = new Promise(resolve => bookTagsIndex.getAll(bookId).onsuccess = e => resolve(e.target.result));
+  const allTagsPromise = new Promise(resolve => tagsStore
+                                     .getAll().onsuccess =
+                                     e => resolve(e.target.result));
+  const bookTagsPromise = new Promise(resolve => bookTagsIndex
+                                      .getAll(bookId).onsuccess =
+                                      e => resolve(e.target.result));
 
   const [allTags, bookTags] = await Promise.all([allTagsPromise, bookTagsPromise]);
 
@@ -1712,7 +1737,9 @@ async function saveBookTags() {
   const index = store.index('by_bookId');
 
   // 1. Get all existing associations for this book
-  const existingAssocs = await new Promise(resolve => index.getAll(bookId).onsuccess = e => resolve(e.target.result));
+  const existingAssocs = await new Promise(resolve => index
+                                           .getAll(bookId).onsuccess =
+                                           e => resolve(e.target.result));
 
   // 2. Delete associations that are no longer needed
   existingAssocs.forEach(assoc => {
@@ -1736,7 +1763,7 @@ async function saveBookTags() {
 
 function closeTagEditor() {
   document.getElementById('tag-editor-overlay').style.display = 'none';
-  tagEditorState = { bookId: null, currentTagIds: new Set(), allTags: [] }; // Reset state
+  tagEditorState = { bookId: null, currentTagIds: new Set(), allTags: [] };
 }
 
 // Hook up tag editor event listeners in the main load event
@@ -1902,8 +1929,12 @@ img {
       const leftOffset = (viewBoxWidth - dimensions.width) / 2;
 
       // Add items for manifest
-      imageItems.push(`<item id="img_${pageNum}" href="Images/page_${pageNum}.${imageExt}" media-type="${imageMime}"/>`);
-      xhtmlItems.push(`<item id="page_${pageNum}" href="Text/page_${pageNum}.xhtml" media-type="application/xhtml+xml"/>`);
+      imageItems.push(`<item id="img_${pageNum}" ` +
+                      `href="Images/page_${pageNum}.${imageExt}" ` +
+                      `media-type="${imageMime}"/>`);
+      xhtmlItems.push(`<item id="page_${pageNum}" ` +
+                      `href="Text/page_${pageNum}.xhtml" ` +
+                      `media-type="application/xhtml+xml"/>`);
 
       // Add item for spine
       let spineItem = `<itemref idref="page_${pageNum}"`;
@@ -1917,7 +1948,8 @@ img {
       spineItems.push(spineItem);
 
       // Add item for TOC
-      tocListItems.push(`<li><a href="Text/page_${pageNum}.xhtml">Page ${pageNum}</a></li>`);
+      tocListItems.push(`<li><a href="Text/page_${pageNum}.xhtml">` +
+                        `Page ${pageNum}</a></li>`);
 
       // Add image file to the new zip
       const imageBlob = await imageFile.async('blob');
@@ -1926,14 +1958,17 @@ img {
       // Create and add XHTML file
       const xhtmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en">
 <head>
   <title>Page ${pageNum}</title>
   <link href="style.css" type="text/css" rel="stylesheet"/>
   <meta name="viewport" content="width=${viewBoxWidth}, height=${viewBoxHeight}"/>
 </head>
 <body>
-  <img src="../Images/page_${pageNum}.${imageExt}" alt="Page ${pageNum}" style="width:${dimensions.width}px; height:${dimensions.height}px; top:${topOffset}px; left:${leftOffset}px;"/>
+  <img src="../Images/page_${pageNum}.${imageExt}" alt="Page ${pageNum}"
+       style="width:${dimensions.width}px; height:${dimensions.height}px; ` +
+            `top:${topOffset}px; left:${leftOffset}px;"/>
 </body>
 </html>`;
       epubZip.file(xhtmlPath, xhtmlContent);
@@ -1943,8 +1978,10 @@ img {
 
     // e. OEBPS/content.opf
     const contentOpf = `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="book-id" version="3.0" prefix="rendition: http://www.idpf.org/2013/rendition/">
-  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="book-id"
+         version="3.0" prefix="rendition: http://www.idpf.org/2013/rendition/">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"
+            xmlns:opf="http://www.idpf.org/2007/opf">
     <dc:title>${bookName}</dc:title>
     <dc:creator>LER Export</dc:creator>
     <dc:language>en</dc:language>
@@ -2061,7 +2098,9 @@ function displayBooks(append = false) {
   isLoadingBooks = true;
 
 
-  const transaction = db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME, STORE_BOOK_TAGS_NAME], 'readonly');
+  const transaction =
+        db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME, STORE_BOOK_TAGS_NAME],
+                       'readonly');
   const store = transaction.objectStore(STORE_BOOKS_NAME);
   const request = store.getAll();
 
@@ -2076,12 +2115,16 @@ function displayBooks(append = false) {
       const metadataMap = new Map(metadataResults.map(m => [m.bookId, m]));
 
       // --- State Filtering ---
-      const filterStateCheckboxes = document.querySelectorAll('#state-filter-options input[name="state"]');
-      const activeStateFilters = [...filterStateCheckboxes].filter(cb => cb.checked).map(cb => cb.value);
+      const filterStateCheckboxes =
+            document.querySelectorAll('#state-filter-options input[name="state"]');
+      const activeStateFilters = [...filterStateCheckboxes]
+            .filter(cb => cb.checked).map(cb => cb.value);
 
       // --- Tag Filtering ---
-      const filterTagCheckboxes = document.querySelectorAll('#tag-filter-options input[name="tag"]');
-      const activeTagFilters = [...filterTagCheckboxes].filter(cb => cb.checked).map(cb => parseInt(cb.value, 10));
+      const filterTagCheckboxes =
+            document.querySelectorAll('#tag-filter-options input[name="tag"]');
+      const activeTagFilters = [...filterTagCheckboxes]
+            .filter(cb => cb.checked).map(cb => parseInt(cb.value, 10));
 
       let booksMatchingTags = null;
       if (activeTagFilters.length > 0) {
@@ -2091,7 +2134,10 @@ function displayBooks(append = false) {
 
         for (const tagId of activeTagFilters) {
           const tagIndex = bookTagsStore.index('by_tagId');
-          const booksForTag = await new Promise(resolve => tagIndex.getAll(tagId).onsuccess = e => resolve(e.target.result));
+          const booksForTag =
+                await new Promise(resolve => tagIndex
+                                  .getAll(tagId).onsuccess =
+                                  e => resolve(e.target.result));
           booksForTag.forEach(bookTag => {
             booksMatchingTags.add(bookTag.bookId);
           });
@@ -2113,7 +2159,8 @@ function displayBooks(append = false) {
 
       const sortBy = document.getElementById('sort-by').value;
       if (sortBy === 'title') {
-        filteredBooks.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        filteredBooks
+          .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
       } else if (sortBy === 'last-read') {
         filteredBooks.sort((a, b) => {
           const metaA = metadataMap.get(a.id);
@@ -2124,7 +2171,8 @@ function displayBooks(append = false) {
         });
       }
 
-      const booksToDisplay = filteredBooks.slice(currentBookOffset, currentBookOffset + BOOKS_PER_PAGE);
+      const booksToDisplay =
+            filteredBooks.slice(currentBookOffset, currentBookOffset + BOOKS_PER_PAGE);
 
       if (booksToDisplay.length === 0 && currentBookOffset === 0) {
         bookGrid.innerHTML = '<p>No books match the current filters.</p>';
@@ -2195,13 +2243,16 @@ function displayBooks(append = false) {
         if (bookMeta && bookMeta.state) {
           const stateOverlay = document.createElement('div');
           stateOverlay.className = 'state-overlay';
-          stateOverlay.textContent = bookMeta.state.charAt(0).toUpperCase() + bookMeta.state.slice(1);
+          stateOverlay.textContent =
+            bookMeta.state.charAt(0).toUpperCase() + bookMeta.state.slice(1);
           cover.appendChild(stateOverlay);
         }
 
         const menu = document.createElement('div');
         menu.className = 'hamburger-menu';
-        menu.innerHTML = `<div class="menu-dot"></div><div class="menu-dot"></div><div class="menu-dot"></div>`;
+        menu.innerHTML = (`<div class="menu-dot"></div>` +
+                          `<div class="menu-dot"></div>` +
+                          `<div class="menu-dot"></div>`);
         tile.appendChild(menu);
 
         const menuContent = document.createElement('div');
@@ -2384,7 +2435,9 @@ function openBook(bookId) {
 }
 
 async function openComicBook(bookRecord, metadata) {
-  soloPageExceptions = (metadata && metadata.soloPageExceptions) ? metadata.soloPageExceptions : [];
+  soloPageExceptions = ((metadata && metadata.soloPageExceptions)
+                        ? metadata.soloPageExceptions
+                        : []);
   comicInfoPageLayouts = new Map(); // Clear for new book
 
   document.getElementById('book-management').style.display = 'none';
@@ -2396,13 +2449,15 @@ async function openComicBook(bookRecord, metadata) {
   readerView.addEventListener('mousemove', showControls);
   showControls();
 
-  let title = bookRecord.name || ''; // Default to an empty string if name is null/undefined
-  document.getElementById('book-title-display').textContent = title.replace(/\.(cbz|epub)$/i, ''); // Use filename as default, remove extension
+  let title = bookRecord.name || '';
+  document.getElementById('book-title-display').textContent =
+    title.replace(/\.(cbz|epub)$/i, ''); // Use filename as default, remove extension
 
   const zip = await JSZip.loadAsync(bookRecord.data);
 
   // Look for ComicInfo.xml
-  const comicInfoFile = Object.values(zip.files).find(file => file.name.toLowerCase().endsWith('comicinfo.xml'));
+  const comicInfoFile = Object.values(zip.files)
+        .find(file => file.name.toLowerCase().endsWith('comicinfo.xml'));
   let directionFromComicInfo = 'rtl'; // Default
 
   if (comicInfoFile) {
@@ -2438,14 +2493,14 @@ async function openComicBook(bookRecord, metadata) {
   if (metadata && metadata.direction) {
     currentBookDirection = metadata.direction;
   } else {
-        currentBookDirection = directionFromComicInfo;
-      }
+    currentBookDirection = directionFromComicInfo;
+  }
 
-      document.getElementById('reader-view').dataset.direction = currentBookDirection;
-      updateDirectionButton();
+  document.getElementById('reader-view').dataset.direction = currentBookDirection;
+  updateDirectionButton();
 
-      const slider = document.getElementById('progress-slider');
-      const currentLabel = document.getElementById('progress-current-label');
+  const slider = document.getElementById('progress-slider');
+  const currentLabel = document.getElementById('progress-current-label');
   const totalLabel = document.getElementById('progress-total-label');
 
   slider.addEventListener('input', () => {
@@ -2460,7 +2515,8 @@ async function openComicBook(bookRecord, metadata) {
   slider.max = comicBookPages.length - 1;
   totalLabel.textContent = comicBookPages.length;
 
-  // Now that comicBookPages is populated, resolve filenames to indices for comicInfoPageLayouts
+  // Now that comicBookPages is populated,
+  // resolve filenames to indices for comicInfoPageLayouts
   const resolvedComicInfoPageLayouts = new Map();
   comicBookPages.forEach((file, index) => {
     if (comicInfoPageLayouts.get(file.name)) {
@@ -2496,7 +2552,9 @@ async function displayComicPage(pageNumber) {
 
   // --- Layout Decision Logic ---
   const page1File = comicBookPages[pageNumber];
-  const page2File = (pageNumber + 1 < comicBookPages.length) ? comicBookPages[pageNumber + 1] : null;
+  const page2File = ((pageNumber + 1 < comicBookPages.length)
+                     ? comicBookPages[pageNumber + 1]
+                     : null);
 
   const [page1Dims, page2Dims] = await Promise.all([
     getImageDimensions(page1File),
@@ -2516,17 +2574,20 @@ async function displayComicPage(pageNumber) {
   } else if (comicInfoPageLayouts.get(pageNumber) === 'double') {
     // 2. Level 2: Explicit Metadata from ComicInfo.xml (Second Priority)
     layout = 'double';
-  } else if (viewerDims.width > viewerDims.height) { // Only consider two-page layout in landscape
+  } else if (viewerDims.width > viewerDims.height) {
+    // Only consider two-page layout in landscape
     // 3. Level 3: Automatic "Wasted Pixel" Calculation (Lowest Priority)
     // Calculate wasted pixels for single page
-    const scaleSingle = Math.min(viewerDims.width / page1Dims.width, viewerDims.height / page1Dims.height);
+    const scaleSingle = Math.min(viewerDims.width / page1Dims.width,
+                                 viewerDims.height / page1Dims.height);
     const areaSingle = (page1Dims.width * scaleSingle) * (page1Dims.height * scaleSingle);
     const wastedSingle = (viewerDims.width * viewerDims.height) - areaSingle;
 
     // Calculate wasted pixels for double page
     const combinedWidth = page1Dims.width + page2Dims.width;
     const combinedHeight = Math.max(page1Dims.height, page2Dims.height);
-    const scaleDouble = Math.min(viewerDims.width / combinedWidth, viewerDims.height / combinedHeight);
+    const scaleDouble = Math.min(viewerDims.width / combinedWidth,
+                                 viewerDims.height / combinedHeight);
     const areaDouble = (combinedWidth * scaleDouble) * (combinedHeight * scaleDouble);
     const wastedDouble = (viewerDims.width * viewerDims.height) - areaDouble;
 
@@ -2542,8 +2603,8 @@ async function displayComicPage(pageNumber) {
 
   const isSoloException = soloPageExceptions.includes(pageNumber);
   if (isSoloException) {
-      readerView.classList.add('show-spread-toggle');
-      spreadToggleButton.textContent = 'Rejoin';
+    readerView.classList.add('show-spread-toggle');
+    spreadToggleButton.textContent = 'Rejoin';
   }
 
 
@@ -2557,7 +2618,8 @@ async function displayComicPage(pageNumber) {
     pagesCurrentlyDisplayed = 1;
   }
 
-  const imagePromises = filesToRender.map(file => file.async('blob').then(blob => URL.createObjectURL(blob)));
+  const imagePromises = filesToRender.map(file => file.async('blob')
+                                          .then(blob => URL.createObjectURL(blob)));
   const imageUrls = await Promise.all(imagePromises);
 
   const fragment = document.createDocumentFragment();
@@ -2599,9 +2661,9 @@ async function displayComicPage(pageNumber) {
 
 
   if (currentBookDirection === 'rtl') {
-      Array.from(fragment.children).reverse().forEach(child => viewer.appendChild(child));
+    Array.from(fragment.children).reverse().forEach(child => viewer.appendChild(child));
   } else {
-      viewer.appendChild(fragment);
+    viewer.appendChild(fragment);
   }
 
   await saveLastLocation();
@@ -2717,7 +2779,8 @@ function openRendition(bookData, metadata) {
         const section = currentBook.spine.get(location.start.index);
         // For pages that are manually split, force a single page view.
         // Otherwise, allow the rendition to automatically handle spreads.
-        if (section && section.properties && section.properties.includes('page-spread-center')) {
+        if (section && section.properties &&
+            section.properties.includes('page-spread-center')) {
           currentRendition.spread('none');
         } else {
           currentRendition.spread('auto');

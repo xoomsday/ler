@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ler-cache-2';
+const CACHE_NAME = 'ler-cache-3';
 
 const assetsToCache = [
   './',
