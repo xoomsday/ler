@@ -37,6 +37,7 @@ let coverObserver = null;
 let currentBookOffset = 0;
 const BOOKS_PER_PAGE = 20;
 let isLoadingBooks = false;
+let currentSliderInputHandler = null;
 
 function setupCoverObserver() {
   coverObserver = new IntersectionObserver((entries, observer) => {
@@ -679,6 +680,12 @@ async function closeReader() {
   window.removeEventListener('keydown', handleKeyPress);
   removeMouseHandlers(readerView);
   clearTimeout(controlsTimer);
+
+  if (currentSliderInputHandler) {
+    const slider = document.getElementById('progress-slider');
+    slider.removeEventListener('input', currentSliderInputHandler);
+    currentSliderInputHandler = null;
+  }
 
   document.getElementById('reader-view').style.display = 'none';
   document.getElementById('viewer').innerHTML = '';
@@ -2503,10 +2510,11 @@ async function openComicBook(bookRecord, metadata) {
   const currentLabel = document.getElementById('progress-current-label');
   const totalLabel = document.getElementById('progress-total-label');
 
-  slider.addEventListener('input', () => {
+  currentSliderInputHandler = () => {
     const pageNum = parseInt(slider.value, 10);
     displayComicPage(pageNum);
-  });
+  };
+  slider.addEventListener('input', currentSliderInputHandler);
 
   comicBookPages = Object.values(zip.files).filter(file =>
     !file.dir && /\.(jpe?g|png|gif|webp)$/i.test(file.name)
@@ -2764,11 +2772,12 @@ function openRendition(bookData, metadata) {
     const currentLabel = document.getElementById('progress-current-label');
     const totalLabel = document.getElementById('progress-total-label');
 
-    slider.addEventListener('input', () => {
+    currentSliderInputHandler = () => {
       const cfi = currentBook.locations.cfiFromLocation(slider.value);
       currentRendition.display(cfi);
       currentLabel.textContent = slider.value;
-    });
+    };
+    slider.addEventListener('input', currentSliderInputHandler);
 
     currentRendition.on('relocated', (location) => {
       const currentLocation = currentBook.locations.locationFromCfi(location.start.cfi);
