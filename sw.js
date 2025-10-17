@@ -1,4 +1,6 @@
-const CACHE_NAME = 'ler-cache-3';
+const CACHE_SERIAL = '4';
+const CACHE_BASE = 'ler-cache-';
+const CACHE_NAME = CACHE_BASE + CACHE_SERIAL;
 
 const assetsToCache = [
   './',
@@ -57,12 +59,12 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
+          if (cacheName.startsWith(CACHE_BASE) &&
+              cacheName != CACHE_NAME) {
             return caches.delete(cacheName);
           }
         })
