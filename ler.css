@@ -374,9 +374,7 @@ h1 {
   transform: scaleX(-1);
 }
 
-#reader-controls.controls-hidden,
-#prev-page-area.controls-hidden,
-#next-page-area.controls-hidden {
+#reader-controls.controls-hidden {
   opacity: 0;
   pointer-events: none;
 }
@@ -531,11 +529,23 @@ h1 {
   font-size: 2em;
   color: rgba(0, 0, 0, 0.4);
   transition: opacity 0.5s ease-in-out, background-color 0.2s;
+  opacity: 0; /* Invisible by default */
 }
 
-#prev-page-area:hover, #next-page-area:hover {
-  background: rgba(0, 0, 0, 0.25);
+#reader-view.controls-visible #prev-page-area,
+#reader-view.controls-visible #next-page-area,
+#prev-page-area:hover,
+#next-page-area:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
 }
+
+.touch-friendly #prev-page-area,
+.touch-friendly #next-page-area {
+    opacity: 0.2; /* Faintly visible on touch devices */
+    background: rgba(0, 0, 0, 0.05);
+}
+
 
 #prev-page-area {
   left: 0;

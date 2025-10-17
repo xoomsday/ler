@@ -65,36 +65,37 @@ function setupScrollObserver() {
 
 
 function showControls() {
+  const readerView = document.getElementById('reader-view');
   const controls = document.getElementById('reader-controls');
-  const prevPage = document.getElementById('prev-page-area');
-  const nextPage = document.getElementById('next-page-area');
-
   controls.classList.remove('controls-hidden');
-  prevPage.classList.remove('controls-hidden');
-  nextPage.classList.remove('controls-hidden');
+  readerView.classList.add('controls-visible');
 
   clearTimeout(controlsTimer);
   controlsTimer = setTimeout(hideControls, 3000);
 }
 
 function hideControls() {
+  const readerView = document.getElementById('reader-view');
   const controls = document.getElementById('reader-controls');
-  const prevPage = document.getElementById('prev-page-area');
-  const nextPage = document.getElementById('next-page-area');
-
   controls.classList.add('controls-hidden');
-  prevPage.classList.add('controls-hidden');
-  nextPage.classList.add('controls-hidden');
+  readerView.classList.remove('controls-visible');
 }
 
-function addMouseHandlers(element) {
+function toggleControls() {
+  const readerView = document.getElementById('reader-view');
+  if (readerView.classList.contains('controls-visible')) {
+    hideControls();
+  } else {
+    showControls();
+  }
+}
+
+function addMouseHandler(element) {
   element.addEventListener('mousemove', showControls);
-  element.addEventListener('click', showControls);
 }
 
 function removeMouseHandlers(element) {
   element.removeEventListener('mousemove', showControls);
-  element.removeEventListener('click', showControls);
 }
 
 function extractReadableText(bodyElement) {
@@ -432,8 +433,6 @@ window.addEventListener('load', async () => {
     } else {
       prevPage();
     }
-    clearTimeout(controlsTimer);
-    controlsTimer = setTimeout(hideControls, 3000);
   });
 
   addCallback('next-page-area', 'click', (event) => {
@@ -442,11 +441,23 @@ window.addEventListener('load', async () => {
     } else {
       nextPage();
     }
-    clearTimeout(controlsTimer);
-    controlsTimer = setTimeout(hideControls, 3000);
   });
 
-  addCallback('sort-by', 'change', displayBooks);
+  // Touch detection
+  window.addEventListener('touchstart', function onFirstTouch() {
+    const readerView = document.getElementById('reader-view');
+    readerView.classList.add('touch-friendly');
+    // Remove mousemove listener if it was added
+    removeMouseHandlers(readerView);
+    // Also remove from iframe if it exists (for epub)
+    const viewerIframe = document.querySelector('#viewer iframe');
+    if (viewerIframe && viewerIframe.contentWindow) {
+      removeMouseHandlers(viewerIframe.contentWindow);
+    }
+    window.removeEventListener('touchstart', onFirstTouch, false);
+  }, false);
+
+  addCallback('sort-by', 'change', () => displayBooks());
 
   // --- New State Filter Dropdown Logic ---
   const stateFilterOptions = document.getElementById('state-filter-options');
@@ -466,7 +477,7 @@ window.addEventListener('load', async () => {
   });
 
   // Re-display books when a filter checkbox is changed
-  stateFilterOptions.addEventListener('change', displayBooks);
+  stateFilterOptions.addEventListener('change', () => displayBooks());
 
   // --- New Tag Filter Dropdown Logic ---
   const tagFilterOptions = document.getElementById('tag-filter-options');
@@ -485,7 +496,7 @@ window.addEventListener('load', async () => {
     }
   });
 
-  tagFilterOptions.addEventListener('change', displayBooks);
+  tagFilterOptions.addEventListener('change', () => displayBooks());
 
   populateTagFilter(); // Populate tags on load
 
@@ -2449,8 +2460,11 @@ async function openComicBook(bookRecord, metadata) {
   readerView.classList.add('comic-mode'); // Add class to hide epub controls
 
   window.addEventListener('keydown', handleKeyPress);
-  readerView.addEventListener('mousemove', showControls);
-  showControls();
+  addMouseHandler(readerView);
+
+  const viewer = document.getElementById('viewer');
+  viewer.addEventListener('click', toggleControls);
+  viewer.addEventListener('touchend', toggleControls);
 
   let title = bookRecord.name || '';
   document.getElementById('book-title-display').textContent =
@@ -2737,8 +2751,7 @@ function openRendition(bookData, metadata) {
   readerView.style.display = 'block';
 
   window.addEventListener('keydown', handleKeyPress);
-  readerView.addEventListener('mousemove', showControls);
-  showControls(); // Show controls when book is opened
+  addMouseHandler(readerView);
 
   currentBook = ePub(bookData);
 
@@ -2798,8 +2811,11 @@ function openRendition(bookData, metadata) {
     currentRendition.on('rendered', () => {
       const view = currentRendition.manager.views.last();
       if (view && view.iframe) {
+        const iframeBody = view.iframe.contentWindow.document.body;
         view.iframe.contentWindow.addEventListener('keydown', handleKeyPress);
-        addMouseHandlers(view.iframe.contentWindow);
+        addMouseHandler(view.iframe.contentWindow);
+        iframeBody.addEventListener('click', toggleControls);
+        iframeBody.addEventListener('touchend', toggleControls);
         view.iframe.contentWindow.focus();
       }
     });
