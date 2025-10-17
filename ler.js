@@ -241,14 +241,18 @@ function togglePlayPause() {
   }
 }
 
+function elementStyle(element) {
+  return document.getElementById(element).style;
+}
+
 function startReading() {
   if (!synth) return;
   isAutoReading = true;
   readCurrentPage();
 
-  document.getElementById('tts-play').style.display = 'none';
-  document.getElementById('tts-pause').style.display = 'inline-block';
-  document.getElementById('tts-stop').style.display = 'inline-block';
+  elementStyle('tts-play').display = 'none';
+  elementStyle('tts-pause').display = 'inline-block';
+  elementStyle('tts-stop').display = 'inline-block';
 }
 
 function stopReading() {
@@ -258,24 +262,24 @@ function stopReading() {
   }
   currentUtterance = null;
 
-  document.getElementById('tts-play').style.display = 'inline-block';
-  document.getElementById('tts-pause').style.display = 'none';
-  document.getElementById('tts-stop').style.display = 'none';
+  elementStyle('tts-play').display = 'inline-block';
+  elementStyle('tts-pause').display = 'none';
+  elementStyle('tts-stop').display = 'none';
 }
 
 function enterSelectionMode() {
   isSelectionModeActive = true;
   document.getElementById('book-management').classList.add('selection-mode');
-  document.getElementById('library-controls').style.display = 'none';
-  document.getElementById('bulk-actions-pane').style.display = 'flex';
+  elementStyle('library-controls').display = 'none';
+  elementStyle('bulk-actions-pane').display = 'flex';
   updateSelectionCount();
 }
 
 function exitSelectionMode() {
   isSelectionModeActive = false;
   document.getElementById('book-management').classList.remove('selection-mode');
-  document.getElementById('library-controls').style.display = 'flex';
-  document.getElementById('bulk-actions-pane').style.display = 'none';
+  elementStyle('library-controls').display = 'flex';
+  elementStyle('bulk-actions-pane').display = 'none';
   selectedBookIds.clear();
   // Remove 'selected' class from all tiles
   document.querySelectorAll('.book-tile.selected').forEach(tile => {
@@ -381,6 +385,12 @@ async function migrateBookmarksFromLocalStorage() {
   });
 }
 
+function addCallback(elemId, event, listener)
+{
+  document.getElementById(elemId).addEventListener(event, listener);
+}
+
+
 window.addEventListener('load', async () => {
   if (localStorage.getItem('ler-dark-mode') === 'true') {
     isDarkMode = true;
@@ -403,22 +413,22 @@ window.addEventListener('load', async () => {
   const bookmarkButton = document.getElementById('bookmark-button');
   bookmarkButton.addEventListener('click', toggleBookmarksOverlay);
 
-  document.getElementById('font-size-dec').addEventListener('click', decreaseFontSize);
-  document.getElementById('font-size-inc').addEventListener('click', increaseFontSize);
-  document.getElementById('line-height-dec').addEventListener('click', decreaseLineHeight);
-  document.getElementById('line-height-inc').addEventListener('click', increaseLineHeight);
-  document.getElementById('dark-mode-toggle').addEventListener('click', toggleDarkMode);
-  document.getElementById('font-toggle').addEventListener('click', toggleFont);
-  document.getElementById('direction-toggle').addEventListener('click', toggleDirection);
-  document.getElementById('spread-toggle').addEventListener('click', toggleSpread);
+  addCallback('font-size-dec', 'click', decreaseFontSize);
+  addCallback('font-size-inc', 'click', increaseFontSize);
+  addCallback('line-height-dec', 'click', decreaseLineHeight);
+  addCallback('line-height-inc', 'click', increaseLineHeight);
+  addCallback('dark-mode-toggle', 'click', toggleDarkMode);
+  addCallback('font-toggle', 'click', toggleFont);
+  addCallback('direction-toggle', 'click', toggleDirection);
+  addCallback('spread-toggle', 'click', toggleSpread);
 
-  document.getElementById('tts-play').addEventListener('click', togglePlayPause);
-  document.getElementById('tts-pause').addEventListener('click', togglePlayPause);
-  document.getElementById('tts-stop').addEventListener('click', stopReading);
+  addCallback('tts-play', 'click', togglePlayPause);
+  addCallback('tts-pause', 'click', togglePlayPause);
+  addCallback('tts-stop', 'click', stopReading);
 
   window.addEventListener('resize', () => {
     if (currentBookType === 'cbz' &&
-        document.getElementById('reader-view').style.display === 'block') {
+        elementStyle('reader-view').display === 'block') {
       displayComicPage(currentComicPage);
     }
   });
@@ -494,17 +504,17 @@ window.addEventListener('load', async () => {
 
 
   // Bulk action event listeners
-  document.getElementById('bulk-cancel').addEventListener('click', exitSelectionMode);
-  document.getElementById('bulk-delete').addEventListener('click', bulkDelete);
-  document.getElementById('bulk-state-change').addEventListener('change', bulkUpdateState);
-  document.getElementById('bulk-add-tag').addEventListener('change', bulkAddTag);
-  document.getElementById('bulk-remove-tag').addEventListener('change', bulkRemoveTag);
+  addCallback('bulk-cancel', 'click', exitSelectionMode);
+  addCallback('bulk-delete', 'click', bulkDelete);
+  addCallback('bulk-state-change', 'change', bulkUpdateState);
+  addCallback('bulk-add-tag', 'change', bulkAddTag);
+  addCallback('bulk-remove-tag', 'change', bulkRemoveTag);
 
   // Tag Editor buttons
-  document.getElementById('tag-editor-cancel').addEventListener('click', closeTagEditor);
-  document.getElementById('tag-editor-save').addEventListener('click', saveBookTags);
-  document.getElementById('add-tag-btn').addEventListener('click', addNewTagFromInput);
-  document.getElementById('new-tag-name').addEventListener('keydown', (e) => {
+  addCallback('tag-editor-cancel', 'click', closeTagEditor);
+  addCallback('tag-editor-save', 'click', saveBookTags);
+  addCallback('add-tag-btn', 'click', addNewTagFromInput);
+  addCallback('new-tag-name', 'keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       addNewTagFromInput();
@@ -687,14 +697,14 @@ async function closeReader() {
     currentSliderInputHandler = null;
   }
 
-  document.getElementById('reader-view').style.display = 'none';
+  elementStyle('reader-view').display = 'none';
   document.getElementById('viewer').innerHTML = '';
-  document.getElementById('progress-indicator').style.display = 'none';
+  elementStyle('progress-indicator').display = 'none';
   // Restore scrolling for the main view
   document.body.style.overflow = '';
   // Restore flex display
-  document.getElementById('book-management').style.display = 'flex';
-  document.getElementById('help-overlay').style.display = 'none';
+  elementStyle('book-management').display = 'flex';
+  elementStyle('help-overlay').display = 'none';
 
   // Reset comic book specific things
   readerView.classList.remove('comic-mode');
@@ -1001,7 +1011,7 @@ function toggleOverlay(type) {
     clearTimeout(controlsTimer);
     controls.classList.remove('controls-hidden');
 
-    document.getElementById('help-overlay').style.display = 'none';
+    elementStyle('help-overlay').display = 'none';
     tocOverlay.style.display = 'block';
     tocOverlay.dataset.content = type;
     if (type === 'toc') {
@@ -1418,7 +1428,7 @@ function generateHelpContent(bookType) {
 }
 
 async function handleKeyPress(event) {
-  if (document.getElementById('reader-view').style.display !== 'block' ||
+  if (elementStyle('reader-view').display !== 'block' ||
       (!currentRendition && currentBookType !== 'cbz')) {
     return;
   }
@@ -1668,7 +1678,7 @@ async function openTagEditor(bookId, bookName) {
   renderTagsInEditor();
 
   // Show the modal
-  document.getElementById('tag-editor-overlay').style.display = 'flex';
+  elementStyle('tag-editor-overlay').display = 'flex';
 }
 
 function renderTagsInEditor() {
@@ -1769,7 +1779,7 @@ async function saveBookTags() {
 }
 
 function closeTagEditor() {
-  document.getElementById('tag-editor-overlay').style.display = 'none';
+  elementStyle('tag-editor-overlay').display = 'none';
   tagEditorState = { bookId: null, currentTagIds: new Set(), allTags: [] };
 }
 
@@ -1778,10 +1788,10 @@ window.addEventListener('load', async () => {
   // ... (existing load event code)
 
   // Tag Editor buttons
-  document.getElementById('tag-editor-cancel').addEventListener('click', closeTagEditor);
-  document.getElementById('tag-editor-save').addEventListener('click', saveBookTags);
-  document.getElementById('add-tag-btn').addEventListener('click', addNewTagFromInput);
-  document.getElementById('new-tag-name').addEventListener('keydown', (e) => {
+  addCallback('tag-editor-cancel', 'click', closeTagEditor);
+  addCallback('tag-editor-save', 'click', saveBookTags);
+  addCallback('add-tag-btn', 'click', addNewTagFromInput);
+  addCallback('new-tag-name', 'keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       addNewTagFromInput();
@@ -2447,7 +2457,7 @@ async function openComicBook(bookRecord, metadata) {
                         : []);
   comicInfoPageLayouts = new Map(); // Clear for new book
 
-  document.getElementById('book-management').style.display = 'none';
+  elementStyle('book-management').display = 'none';
   const readerView = document.getElementById('reader-view');
   readerView.style.display = 'block';
   readerView.classList.add('comic-mode'); // Add class to hide epub controls
@@ -2736,7 +2746,7 @@ function openRendition(bookData, metadata) {
 
   const cfi = metadata ? metadata.lastLocation : null;
 
-  document.getElementById('book-management').style.display = 'none';
+  elementStyle('book-management').display = 'none';
   const readerView = document.getElementById('reader-view');
   readerView.style.display = 'block';
 
