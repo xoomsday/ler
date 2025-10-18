@@ -696,7 +696,6 @@ async function closeReader() {
 
   elementStyle('reader-view').display = 'none';
   document.getElementById('viewer').innerHTML = '';
-  elementStyle('progress-indicator').display = 'none';
   // Restore scrolling for the main view
   document.body.style.overflow = '';
   // Restore flex display
@@ -2691,7 +2690,6 @@ async function displayComicPage(pageNumber) {
   }
 
   await saveLastLocation();
-  updateProgressIndicator();
 }
 
 function getImageDimensions(pageFile) {
@@ -2810,7 +2808,6 @@ function openRendition(bookData, metadata) {
           currentRendition.spread('auto');
         }
       }
-      updateProgressIndicator();
       saveLastLocation();
     });
 
