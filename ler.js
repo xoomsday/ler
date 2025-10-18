@@ -1349,6 +1349,9 @@ async function handleEpubKeyPress(event) {
   case '.':
     showControls();
     break;
+  case 'Q':
+    closeReader();
+    break;
   case '?':
     const helpOverlay = document.getElementById('help-overlay');
     if (helpOverlay.style.display === 'none') {
