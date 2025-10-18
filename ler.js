@@ -401,17 +401,10 @@ window.addEventListener('load', async () => {
   await migrateBookmarksFromLocalStorage();
   displayBooks();
 
-  const uploadInput = document.getElementById('epub-upload');
-  uploadInput.addEventListener('change', handleFileUpload);
-
-  const closeButton = document.getElementById('close-reader');
-  closeButton.addEventListener('click', closeReader);
-
-  const tocButton = document.getElementById('toc-button');
-  tocButton.addEventListener('click', toggleToc);
-
-  const bookmarkButton = document.getElementById('bookmark-button');
-  bookmarkButton.addEventListener('click', toggleBookmarksOverlay);
+  addCallback('epub-upload', 'change', handleFileUpload);
+  addCallback('close-reader', 'click', closeReader);
+  addCallback('toc-button', 'click', toggleToc);
+  addCallback('bookmark-button', 'click', toggleBookmarksOverlay);
 
   addCallback('font-size-dec', 'click', decreaseFontSize);
   addCallback('font-size-inc', 'click', increaseFontSize);
@@ -433,8 +426,7 @@ window.addEventListener('load', async () => {
     }
   });
 
-  const prevPageArea = document.getElementById('prev-page-area');
-  prevPageArea.addEventListener('click', (event) => {
+  addCallback('prev-page-area', 'click', (event) => {
     if (currentBookDirection === 'rtl') {
       nextPage();
     } else {
@@ -444,8 +436,7 @@ window.addEventListener('load', async () => {
     controlsTimer = setTimeout(hideControls, 3000);
   });
 
-  const nextPageArea = document.getElementById('next-page-area');
-  nextPageArea.addEventListener('click', (event) => {
+  addCallback('next-page-area', 'click', (event) => {
     if (currentBookDirection === 'rtl') {
       prevPage();
     } else {
@@ -455,14 +446,11 @@ window.addEventListener('load', async () => {
     controlsTimer = setTimeout(hideControls, 3000);
   });
 
-  const sortBy = document.getElementById('sort-by');
-  sortBy.addEventListener('change', displayBooks);
+  addCallback('sort-by', 'change', displayBooks);
 
   // --- New State Filter Dropdown Logic ---
-  const stateFilterBtn = document.getElementById('state-filter-btn');
   const stateFilterOptions = document.getElementById('state-filter-options');
-
-  stateFilterBtn.addEventListener('click', (event) => {
+  addCallback('state-filter-btn', 'click', (event) => {
     // Prevent the window click listener from closing it immediately
     event.stopPropagation();
     stateFilterOptions.classList.toggle('show');
@@ -481,10 +469,9 @@ window.addEventListener('load', async () => {
   stateFilterOptions.addEventListener('change', displayBooks);
 
   // --- New Tag Filter Dropdown Logic ---
-  const tagFilterBtn = document.getElementById('tag-filter-btn');
   const tagFilterOptions = document.getElementById('tag-filter-options');
 
-  tagFilterBtn.addEventListener('click', (event) => {
+  addCallback('tag-filter-btn', 'click', (event) => {
     event.stopPropagation();
     tagFilterOptions.classList.toggle('show');
   });
@@ -501,7 +488,6 @@ window.addEventListener('load', async () => {
   tagFilterOptions.addEventListener('change', displayBooks);
 
   populateTagFilter(); // Populate tags on load
-
 
   // Bulk action event listeners
   addCallback('bulk-cancel', 'click', exitSelectionMode);
