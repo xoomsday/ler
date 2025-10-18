@@ -2795,7 +2795,15 @@ function openRendition(bookData, metadata) {
     currentRendition.on('relocated', (location) => {
       const currentLocation = currentBook.locations.locationFromCfi(location.start.cfi);
       slider.value = currentLocation;
-      currentLabel.textContent = currentLocation;
+
+      const percentage = currentBook.locations.percentageFromCfi(location.start.cfi);
+      if (percentage !== null && !isNaN(percentage)) {
+        currentLabel.textContent =
+          `(${(percentage * 100).toFixed(0)}%) ${currentLocation}`;
+      } else {
+        currentLabel.textContent = currentLocation;
+      }
+
       // --- Manual Spread Handling for Pre-paginated Books ---
       if (isPrePaginated) {
         const section = currentBook.spine.get(location.start.index);
