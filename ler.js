@@ -2792,8 +2792,16 @@ function openRendition(bookData, metadata) {
     };
     slider.addEventListener('input', currentSliderInputHandler);
 
+    await currentBookLocationsPromise; // Ensure locations are generated
+    slider.max = currentBook.locations.total - 1;
+    totalLabel.textContent = currentBook.locations.total - 1;
+
     currentRendition.on('relocated', (location) => {
       const currentLocation = currentBook.locations.locationFromCfi(location.start.cfi);
+
+      if (currentLocation < 0) {
+        console.log(`cannot happen ${currentLocation} < 0`);
+      }
       slider.value = currentLocation;
 
       const percentage = currentBook.locations.percentageFromCfi(location.start.cfi);
@@ -2845,10 +2853,6 @@ function openRendition(bookData, metadata) {
     } else {
       await currentRendition.display();
     }
-
-    await currentBookLocationsPromise; // Ensure locations are generated
-    slider.max = currentBook.locations.total - 1;
-    totalLabel.textContent = currentBook.locations.total - 1;
 
     await saveLastLocation();
   });
