@@ -1350,7 +1350,7 @@ async function handleEpubKeyPress(event) {
     addNewBookmark();
     break;
   case '.':
-    showControls();
+    toggleControls();
     break;
   case 'Q':
     closeReader();
@@ -1382,7 +1382,7 @@ async function handleCbzKeyPress(event) {
     toggleSpread();
     break;
   case '.':
-    showControls();
+    toggleControls();
     break;
   case 'Q':
     closeReader();
