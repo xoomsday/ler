@@ -602,6 +602,7 @@ window.addEventListener('load', async () => {
   addCallback('bulk-add-tag', 'change', bulkAddTag);
   addCallback('bulk-remove-tag', 'change', bulkRemoveTag);
   addCallback('export-progress-btn', 'click', exportProgress);
+  addCallback('import-progress-file', 'change', importProgress);
 
   // Tag Editor buttons
   addCallback('tag-editor-cancel', 'click', closeTagEditor);
@@ -2179,6 +2180,127 @@ img {
   }
 }
 
+const IMPORT_VALIDATION_MAP = new Map([
+  ['lastLocation', (value, localMeta) => {
+    if (localMeta.type === 'cbz') {
+      const pageNum = parseInt(value, 10);
+      return !isNaN(pageNum) && pageNum >= 0;
+    }
+    if (localMeta.type === 'epub') {
+      return typeof value === 'string' && value.length > 0;
+    }
+    return false; // Unknown type
+  }],
+  ['progress', (value) => typeof value === 'number' && value >= 0 && value <= 1],
+  ['state', (value) => ['unread', 'reading', 'finished'].includes(value)],
+  ['lastReadTimestamp', (value) => Number.isInteger(value) && value > 0],
+  ['fontSize', (value) => typeof value === 'number' && value > 0],
+  ['lineHeight', (value) => typeof value === 'number' && value > 0],
+  ['font', (value) => ['serif', 'sans-serif'].includes(value)],
+  ['direction', (value) => ['ltr', 'rtl'].includes(value)],
+  ['soloPageExceptions', (value) => Array.isArray(value) && value.every(item => typeof item === 'number')]
+]);
+
+async function importProgress(event) {
+  const file = event.target.files[0];
+  if (!file) {
+    return;
+  }
+
+  const notification = document.createElement('div');
+  notification.id = 'toast-notification';
+  notification.textContent = 'Importing progress file...';
+  document.body.appendChild(notification);
+
+  try {
+    const text = await file.text();
+    const importedData = JSON.parse(text);
+
+    if (!importedData || typeof importedData.books !== 'object') {
+      throw new Error('Invalid progress file format.');
+    }
+
+    // Step 1: Create a map of local book hashes to their metadata
+    const metaTransaction = db.transaction([STORE_METADATA_NAME], 'readonly');
+    const metadataStore = metaTransaction.objectStore(STORE_METADATA_NAME);
+    const allMetadata = await new Promise((resolve, reject) => {
+      const request = metadataStore.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    const localHashMap = new Map();
+    for (const meta of allMetadata) {
+      if (meta.contentHash) {
+        localHashMap.set(meta.contentHash, meta);
+      }
+    }
+
+    // Step 2: Iterate through imported books and update if newer
+    let updatedCount = 0;
+    let notFoundCount = 0;
+    const importedHashes = Object.keys(importedData.books);
+
+    const updateTransaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+    const updateStore = updateTransaction.objectStore(STORE_METADATA_NAME);
+
+    for (const hash of importedHashes) {
+      const importedMeta = importedData.books[hash];
+      const localMeta = localHashMap.get(hash);
+
+      if (localMeta && importedMeta) {
+        const localTimestamp = localMeta.lastReadTimestamp || 0;
+        const importedTimestamp = importedMeta.lastReadTimestamp || 0;
+
+        if (importedTimestamp > localTimestamp) {
+          let hasValidChanges = false;
+          for (const [key, validator] of IMPORT_VALIDATION_MAP.entries()) {
+            if (Object.prototype.hasOwnProperty.call(importedMeta, key)) {
+              const value = importedMeta[key];
+              if (validator(value, localMeta)) {
+                localMeta[key] = value;
+                hasValidChanges = true;
+              } else {
+                console.warn(`Invalid value for '${key}' in imported book ${hash}:`, value);
+              }
+            }
+          }
+
+          if (hasValidChanges) {
+            updateStore.put(localMeta);
+            updatedCount++;
+          }
+        }
+      } else {
+        notFoundCount++;
+      }
+    }
+
+    await new Promise(resolve => updateTransaction.oncomplete = resolve);
+
+    // Step 3: Show summary and refresh
+    let summary = `${updatedCount} book(s) updated.`;
+    if (notFoundCount > 0) {
+      summary += ` ${notFoundCount} book(s) not found in library.`;
+    }
+    notification.textContent = summary;
+
+    displayBooks(); // Refresh the library view
+
+  } catch (error) {
+    console.error('Error importing progress:', error);
+    notification.textContent = 'Error during import.';
+  } finally {
+    // Reset file input so the same file can be selected again
+    event.target.value = null;
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, 4000);
+  }
+}
+
 async function exportProgress() {
   const notification = document.createElement('div');
   notification.id = 'toast-notification';
@@ -2186,7 +2308,7 @@ async function exportProgress() {
   document.body.appendChild(notification);
 
   try {
-    // Step 1: Fetch all metadata (it's small and contains name/type/contentHash)
+    // Step 1: Fetch all metadata first (it's small and contains name/type/contentHash)
     const metaTransaction = db.transaction([STORE_METADATA_NAME], 'readonly');
     const metadataStore = metaTransaction.objectStore(STORE_METADATA_NAME);
     const allMetadata = await new Promise((resolve, reject) => {
