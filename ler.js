@@ -2457,6 +2457,22 @@ function openBook(bookId) {
   });
 }
 
+function updateTrcGroupVisibility() {
+  const groups = document.querySelectorAll('#top-reader-controls .trc-group');
+  groups.forEach(group => {
+    const children = Array.from(group.children);
+    const allHidden = children.every(child => {
+      const style = window.getComputedStyle(child);
+      return style.display === 'none';
+    });
+    if (allHidden) {
+      group.classList.add('hidden');
+    } else {
+      group.classList.remove('hidden');
+    }
+  });
+}
+
 async function openComicBook(bookRecord, metadata) {
   soloPageExceptions = ((metadata && metadata.soloPageExceptions)
                         ? metadata.soloPageExceptions
@@ -2467,6 +2483,7 @@ async function openComicBook(bookRecord, metadata) {
   const readerView = document.getElementById('reader-view');
   readerView.style.display = 'block';
   readerView.classList.add('comic-mode'); // Add class to hide epub controls
+  updateTrcGroupVisibility();
 
   window.addEventListener('keydown', handleKeyPress);
   addMouseHandler(readerView);
@@ -2633,6 +2650,7 @@ async function displayComicPage(pageNumber) {
     readerView.classList.add('show-spread-toggle');
     spreadToggleButton.textContent = 'Rejoin';
   }
+  updateTrcGroupVisibility();
 
 
   const filesToRender = [];
@@ -2850,6 +2868,7 @@ function openRendition(bookData, metadata) {
       currentRendition.themes.override('color', '#e0e0e0');
       currentRendition.themes.override('background', '#121212');
     }
+    updateTrcGroupVisibility();
 
     if (cfi) {
       await gotoCFI(cfi);

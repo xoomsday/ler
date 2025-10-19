@@ -69,37 +69,47 @@
   <div id="reader-view" style="display: none;">
     <div id="reader-controls">
       <div id="top-reader-controls">
-        <button id="close-reader">X</button>
-        <button id="toc-button">☰</button>
-        <button id="bookmark-button">🔖</button>
-        <div class="control-pill">
-          <button id="font-size-dec">-</button>
-          <span id="font-size-value">100%</span>
-          <button id="font-size-inc">+</button>
+        <div class="trc-group">
+          <button id="toc-button">☰</button>
+          <button id="bookmark-button">🔖</button>
         </div>
-        <div class="control-pill">
-          <button id="line-height-dec">-</button>
-          <span id="line-height-value">1.5</span>
-          <button id="line-height-inc">+</button>
+        <div class="trc-group">
+          <div class="control-pill">
+            <button id="font-size-dec">-</button>
+            <span id="font-size-value">100%</span>
+            <button id="font-size-inc">+</button>
+          </div>
+          <div class="control-pill">
+            <button id="line-height-dec">-</button>
+            <span id="line-height-value">1.5</span>
+            <button id="line-height-inc">+</button>
+          </div>
         </div>
-        <div class="control-pill" id="dark-mode-pill">
-          <button id="dark-mode-toggle">🌙</button>
+        <div class="trc-group">
+          <div class="control-pill" id="dark-mode-pill">
+            <button id="dark-mode-toggle">🌙</button>
+          </div>
+          <div class="control-pill">
+            <button id="font-toggle">A</button>
+          </div>
+          <div class="control-pill" id="tts-pill">
+            <button id="tts-play">▶️</button>
+            <button id="tts-pause" style="display: none;">⏸️</button>
+            <button id="tts-stop" style="display: none;">⏹️</button>
+          </div>
         </div>
-        <div class="control-pill">
-          <button id="font-toggle">A</button>
+        <div class="trc-group">
+          <div class="control-pill" id="direction-toggle-pill">
+            <button id="direction-toggle">LTR</button>
+          </div>
+          <div class="control-pill" id="spread-toggle-pill">
+            <button id="spread-toggle">Split</button>
+          </div>
         </div>
-        <div class="control-pill" id="tts-pill">
-          <button id="tts-play">▶️</button>
-          <button id="tts-pause" style="display: none;">⏸️</button>
-          <button id="tts-stop" style="display: none;">⏹️</button>
+        <div class="trc-title-close-group">
+          <div id="book-title-display"></div>
+          <button id="close-reader">X</button>
         </div>
-        <div class="control-pill" id="direction-toggle-pill">
-          <button id="direction-toggle">LTR</button>
-        </div>
-        <div class="control-pill" id="spread-toggle-pill">
-          <button id="spread-toggle">Split</button>
-        </div>
-        <div id="book-title-display"></div>
       </div>
       <div id="progress-slider-container">
         <input type="range" id="progress-slider" min="0" value="0" step="1">

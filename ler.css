@@ -304,6 +304,9 @@ h1 {
   margin-left: auto; /* Pushes cancel to the right */
 }
 
+.trc-group.hidden {
+  display: none;
+}
 
 
 .book-title {
@@ -349,6 +352,8 @@ h1 {
   align-items: center;
   gap: 1em;
   width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 #progress-slider-container {
@@ -695,4 +700,32 @@ h1 {
   padding-top: 1em;
   border-top: 1px solid #eee;
   text-align: right;
+}
+
+#book-title-display {
+  /* flex-grow: 10;  High grow factor to take up space */
+  /* flex-shrink: 1; */
+  flex-basis: 10em; /* Start with a decent basis */
+  text-align: center;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trc-title-close-group {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 15em; /* Give it a base width to influence wrapping */
+  gap: 1em; /* Space between title and close button */
+}
+
+/* Give the groups a low shrink factor so they stay together */
+.trc-group {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    flex-shrink: 0; /* Prevent shrinking of groups */
 }
