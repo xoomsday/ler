@@ -2787,8 +2787,7 @@ function openRendition(bookData, metadata) {
 
     currentSliderInputHandler = () => {
       const cfi = currentBook.locations.cfiFromLocation(slider.value);
-      currentRendition.display(cfi);
-      currentLabel.textContent = slider.value;
+      gotoCFI(cfi);
     };
     slider.addEventListener('input', currentSliderInputHandler);
 
