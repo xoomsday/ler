@@ -1134,8 +1134,12 @@ async function gotoCFI(cfi) {
   // Now, loop until we are at the correct page or slightly past it.
   // A safety break is included to prevent infinite loops.
   for (let i = 0; i < 50; i++) {
-    const currentLocation = currentRendition.currentLocation().start.cfi;
-    const comparison = currentRendition.epubcfi.compare(cfi, currentLocation);
+    const currentLocation = currentRendition.currentLocation();
+    if (!currentLocation || !currentLocation.start) {
+      return;
+    }
+    const currentCFI = currentLocation.start.cfi;
+    const comparison = currentRendition.epubcfi.compare(cfi, currentCFI);
 
     if (comparison > 0) {
       // The target CFI is still ahead of us. Go to the next page and wait.
