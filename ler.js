@@ -1,7 +1,7 @@
 // LER javascript
 
 const DB_NAME = 'ler-books';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const STORE_BOOKS_NAME = 'epubs';
 const STORE_METADATA_NAME = 'metadata';
 const STORE_BOOKMARKS_NAME = 'bookmarks';
@@ -327,6 +327,30 @@ function initDB() {
           bookTagsStore.createIndex('by_tagId', 'tagId', { unique: false });
         }
       }
+      if (event.oldVersion < 5) {
+        const transaction = request.transaction;
+        const metadataStore = transaction.objectStore(STORE_METADATA_NAME);
+        metadataStore.createIndex('by_contentHash', 'contentHash', { unique: false });
+
+        // Migrate existing data
+        const booksStore = transaction.objectStore(STORE_BOOKS_NAME);
+        booksStore.openCursor().onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const book = cursor.value;
+            const metadataRequest = metadataStore.get(book.id);
+            metadataRequest.onsuccess = (e) => {
+              const metadata = e.target.result;
+              if (metadata) {
+                metadata.name = book.name;
+                metadata.type = book.type;
+                metadataStore.put(metadata);
+              }
+            };
+            cursor.continue();
+          }
+        };
+      }
     };
 
     request.onsuccess = (event) => {
@@ -391,6 +415,76 @@ function addCallback(elemId, event, listener)
   document.getElementById(elemId).addEventListener(event, listener);
 }
 
+async function startBackgroundHashMigration() {
+  if (!('requestIdleCallback' in window)) {
+    console.warn('requestIdleCallback not supported, background hashing skipped.');
+    return;
+  }
+
+  const metadataTransaction = db.transaction([STORE_METADATA_NAME], 'readonly');
+  const metadataStore = metadataTransaction.objectStore(STORE_METADATA_NAME);
+  const allMetadata = await new Promise(resolve => metadataStore.getAll().onsuccess = e => resolve(e.target.result));
+
+  const bookIdsToHash = allMetadata
+    .filter(meta => !meta.contentHash)
+    .map(meta => meta.bookId);
+
+  if (bookIdsToHash.length === 0) {
+    return; // Nothing to do
+  }
+
+  console.log(`Starting background hash migration for ${bookIdsToHash.length} books.`);
+
+  let currentIndex = 0;
+
+  const processNextBook = (deadline) => {
+    // Process books as long as there's time and books left to hash
+    while (deadline.timeRemaining() > 0 && currentIndex < bookIdsToHash.length) {
+      const bookId = bookIdsToHash[currentIndex];
+
+      // Use a self-executing async function to handle the async operations
+      // for a single book within the synchronous idle callback loop.
+      (async () => {
+        try {
+          const bookTransaction = db.transaction([STORE_BOOKS_NAME], 'readonly');
+          const bookStore = bookTransaction.objectStore(STORE_BOOKS_NAME);
+          const book = await new Promise(resolve => bookStore.get(bookId).onsuccess = e => resolve(e.target.result));
+
+          if (book && book.data) {
+            const contentHash = await calculateSha256Hash(book.data);
+
+            const updateTransaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+            const updateStore = updateTransaction.objectStore(STORE_METADATA_NAME);
+            const metadata = await new Promise(resolve => updateStore.get(bookId).onsuccess = e => resolve(e.target.result));
+
+            if (metadata) {
+              metadata.contentHash = contentHash;
+              metadata.name = book.name;
+              metadata.type = book.type;
+              updateStore.put(metadata);
+              await new Promise(resolve => updateTransaction.oncomplete = resolve);
+              console.log(`Hashed book ${bookId} in background.`);
+            }
+          }
+        } catch (error) {
+          console.error(`Error hashing book ${bookId} in background:`, error);
+        }
+      })(); // Immediately invoke the function
+
+      currentIndex++;
+    }
+
+    // If there are still books left, schedule the next run
+    if (currentIndex < bookIdsToHash.length) {
+      window.requestIdleCallback(processNextBook);
+    } else {
+      console.log('Background hash migration complete.');
+    }
+  };
+
+  // Kick off the first idle callback
+  window.requestIdleCallback(processNextBook);
+}
 
 window.addEventListener('load', async () => {
   if (localStorage.getItem('ler-dark-mode') === 'true') {
@@ -401,6 +495,7 @@ window.addEventListener('load', async () => {
   await initDB();
   await migrateBookmarksFromLocalStorage();
   displayBooks();
+  startBackgroundHashMigration(); // Start background hashing
 
   addCallback('epub-upload', 'change', handleFileUpload);
   addCallback('close-reader', 'click', closeReader);
@@ -506,6 +601,7 @@ window.addEventListener('load', async () => {
   addCallback('bulk-state-change', 'change', bulkUpdateState);
   addCallback('bulk-add-tag', 'change', bulkAddTag);
   addCallback('bulk-remove-tag', 'change', bulkRemoveTag);
+  addCallback('export-progress-btn', 'click', exportProgress);
 
   // Tag Editor buttons
   addCallback('tag-editor-cancel', 'click', closeTagEditor);
@@ -1489,6 +1585,13 @@ async function handleFileUpload(event) {
   }
 }
 
+async function calculateSha256Hash(data) {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hexHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return `SHA-256:${hexHash}`;
+}
+
 function storeBook(name, data) {
   return new Promise(async (resolve, reject) => {
     try {
@@ -1511,9 +1614,10 @@ function storeBook(name, data) {
       const book = { name, data, coverImage, type: 'epub' };
       const request = booksStore.add(book);
 
-      request.onsuccess = (event) => {
+      request.onsuccess = async (event) => {
         const bookId = event.target.result;
-        const metadata = { bookId: bookId, state: 'unread', progress: 0 };
+        const contentHash = await calculateSha256Hash(data);
+        const metadata = { bookId: bookId, state: 'unread', progress: 0, contentHash: contentHash, name: book.name, type: book.type };
         metadataStore.add(metadata);
       };
 
@@ -1557,9 +1661,10 @@ async function storeComicBook(name, data) {
       const book = { name, data, coverImage, type: 'cbz' };
       const request = booksStore.add(book);
 
-      request.onsuccess = (event) => {
+      request.onsuccess = async (event) => {
         const bookId = event.target.result;
-        const metadata = { bookId: bookId, state: 'unread', progress: 0 };
+        const contentHash = await calculateSha256Hash(book.data);
+        const metadata = { bookId: bookId, state: 'unread', progress: 0, contentHash: contentHash, name: book.name, type: book.type };
         metadataStore.add(metadata);
       };
 
@@ -2071,6 +2176,97 @@ img {
     alert(`An error occurred during export: ${error.message}`);
   } finally {
     document.body.removeChild(notification);
+  }
+}
+
+async function exportProgress() {
+  const notification = document.createElement('div');
+  notification.id = 'toast-notification';
+  notification.textContent = 'Generating progress file...';
+  document.body.appendChild(notification);
+
+  try {
+    // Step 1: Fetch all metadata (it's small and contains name/type/contentHash)
+    const metaTransaction = db.transaction([STORE_METADATA_NAME], 'readonly');
+    const metadataStore = metaTransaction.objectStore(STORE_METADATA_NAME);
+    const allMetadata = await new Promise((resolve, reject) => {
+      const request = metadataStore.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    const exportData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      books: {}
+    };
+
+    // Step 2: Process metadata, performing on-demand hashing if necessary
+    for (const meta of allMetadata) {
+      let contentHash = meta.contentHash;
+
+      // If hash is missing (background migration hasn't reached it yet), calculate it synchronously
+      if (!contentHash) {
+        console.warn(`Hash missing for book ID ${meta.bookId}, calculating now for export.`);
+        const bookTransaction = db.transaction([STORE_BOOKS_NAME], 'readonly');
+        const booksStore = bookTransaction.objectStore(STORE_BOOKS_NAME);
+        const book = await new Promise((resolve, reject) => {
+          const request = booksStore.get(meta.bookId);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+
+        if (book && book.data) {
+          contentHash = await calculateSha256Hash(book.data);
+          // Update metadata with the new hash, name, and type
+          const updateTransaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+          const updateStore = updateTransaction.objectStore(STORE_METADATA_NAME);
+          meta.contentHash = contentHash;
+          meta.name = book.name; // Ensure name is also in metadata
+          meta.type = book.type; // Ensure type is also in metadata
+          updateStore.put(meta);
+          await new Promise(res => updateTransaction.oncomplete = res);
+        } else {
+          console.error(`Book data not found for ID ${meta.bookId}, cannot hash for export.`);
+          continue; // Skip this book if data is missing
+        }
+      }
+
+      // Add all relevant metadata to the export object
+      const bookExport = {
+        ...meta // Copy all fields from metadata
+      };
+      delete bookExport.bookId; // Remove the internal bookId
+
+      exportData.books[contentHash] = bookExport;
+    }
+
+    // Step 3: Finalize and download the file
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ler_progress.json';
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+
+    notification.textContent = 'Progress file exported successfully!';
+  } catch (error) {
+    console.error('Error exporting progress:', error);
+    notification.textContent = 'Error during export.';
+  } finally {
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, 3000);
   }
 }
 
