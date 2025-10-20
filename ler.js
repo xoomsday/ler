@@ -1634,17 +1634,18 @@ function storeBook(name, data) {
         URL.revokeObjectURL(coverUrl); // Clean up blob URL
       }
 
+      const book = { name, data, coverImage, type: 'epub' };
+      const contentHash = await calculateSha256Hash(data);
+
       const transaction =
             db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME], 'readwrite');
       const booksStore = transaction.objectStore(STORE_BOOKS_NAME);
       const metadataStore = transaction.objectStore(STORE_METADATA_NAME);
 
-      const book = { name, data, coverImage, type: 'epub' };
       const request = booksStore.add(book);
 
-      request.onsuccess = async (event) => {
+      request.onsuccess = (event) => {
         const bookId = event.target.result;
-        const contentHash = await calculateSha256Hash(data);
         const metadata = { bookId: bookId, state: 'unread', progress: 0, contentHash: contentHash, name: book.name, type: book.type };
         metadataStore.add(metadata);
       };
@@ -1681,17 +1682,18 @@ async function storeComicBook(name, data) {
         coverImage = await resizeImageBlob(blob);
       }
 
+      const book = { name, data, coverImage, type: 'cbz' };
+      const contentHash = await calculateSha256Hash(book.data);
+
       const transaction =
             db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME], 'readwrite');
       const booksStore = transaction.objectStore(STORE_BOOKS_NAME);
       const metadataStore = transaction.objectStore(STORE_METADATA_NAME);
 
-      const book = { name, data, coverImage, type: 'cbz' };
       const request = booksStore.add(book);
 
-      request.onsuccess = async (event) => {
+      request.onsuccess = (event) => {
         const bookId = event.target.result;
-        const contentHash = await calculateSha256Hash(book.data);
         const metadata = { bookId: bookId, state: 'unread', progress: 0, contentHash: contentHash, name: book.name, type: book.type };
         metadataStore.add(metadata);
       };
