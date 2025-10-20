@@ -107,6 +107,15 @@ h1 {
   display: block;
 }
 
+#app-menu {
+  margin-left: auto;
+}
+
+#app-menu-options {
+  right: 0;
+  left: auto;
+}
+
 
 .book-management.selection-mode #library-controls {
   display: none;

@@ -91,3 +91,34 @@ body.dark-mode {
   border-color: #555;
   color: #e0e0e0;
 }
+
+.dark-mode .filter-btn {
+  background-color: #333;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+.dark-mode .filter-btn:hover {
+  background-color: #444;
+}
+
+.dark-mode .filter-options {
+  background-color: #333;
+  border-color: #555;
+}
+
+.dark-mode .filter-options label {
+  color: #e0e0e0;
+}
+
+.dark-mode .filter-options label:hover {
+  background-color: #444;
+}
+
+.dark-mode #app-menu-options a {
+  color: #e0e0e0;
+}
+
+.dark-mode #app-menu-options a:hover {
+  background-color: #444;
+}

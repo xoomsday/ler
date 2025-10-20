@@ -582,16 +582,53 @@ window.addEventListener('load', async () => {
     tagFilterOptions.classList.toggle('show');
   });
 
+  // --- New App Menu Logic ---
+  const appMenuOptions = document.getElementById('app-menu-options');
+  const importFileInput = document.getElementById('import-progress-file');
+
+  addCallback('app-menu-btn', 'click', (event) => {
+    event.stopPropagation();
+    appMenuOptions.classList.toggle('show');
+  });
+
+  addCallback('export-progress-menu-item', 'click', (e) => {
+    e.preventDefault();
+    exportProgress();
+    appMenuOptions.classList.remove('show');
+  });
+
+  addCallback('import-progress-menu-item', 'click', (e) => {
+    e.preventDefault();
+    importFileInput.click();
+    appMenuOptions.classList.remove('show');
+  });
+
+  addCallback('dark-mode-menu-item', 'click', (e) => {
+    e.preventDefault();
+    toggleDarkMode();
+    appMenuOptions.classList.remove('show');
+  });
+
+  addCallback('quit-app-menu-item', 'click', (e) => {
+    e.preventDefault();
+    window.close();
+    appMenuOptions.classList.remove('show');
+  });
+
   // We can reuse the window click listener to close this dropdown as well
   window.addEventListener('click', (event) => {
     if (!event.target.matches('.filter-btn')) {
       if (tagFilterOptions.classList.contains('show')) {
         tagFilterOptions.classList.remove('show');
       }
+      if (appMenuOptions.classList.contains('show')) {
+        appMenuOptions.classList.remove('show');
+      }
     }
   });
 
   tagFilterOptions.addEventListener('change', () => displayBooks());
+  importFileInput.addEventListener('change', importProgress);
 
   populateTagFilter(); // Populate tags on load
 
@@ -601,8 +638,6 @@ window.addEventListener('load', async () => {
   addCallback('bulk-state-change', 'change', bulkUpdateState);
   addCallback('bulk-add-tag', 'change', bulkAddTag);
   addCallback('bulk-remove-tag', 'change', bulkRemoveTag);
-  addCallback('export-progress-btn', 'click', exportProgress);
-  addCallback('import-progress-file', 'change', importProgress);
 
   // Tag Editor buttons
   addCallback('tag-editor-cancel', 'click', closeTagEditor);

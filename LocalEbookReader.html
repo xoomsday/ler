@@ -39,10 +39,17 @@
             <option value="last-read">Last Read</option>
           </select>
         </div>
-        <button id="export-progress-btn">Export Progress</button>
-        <label for="import-progress-file" class="button-like-label">Import Progress</label>
-        <input type="file" id="import-progress-file" accept=".json" style="display: none;">
       </div>
+      <div id="app-menu" class="filter-dropdown">
+        <button id="app-menu-btn" class="filter-btn">⋮</button>
+        <div id="app-menu-options" class="filter-options">
+          <a href="#" id="export-progress-menu-item">Export Progress</a>
+          <a href="#" id="import-progress-menu-item">Import Progress</a>
+          <a href="#" id="dark-mode-menu-item">Toggle Dark Mode</a>
+          <a href="#" id="quit-app-menu-item">Quit</a>
+        </div>
+      </div>
+      <input type="file" id="import-progress-file" accept=".json" style="display: none;">
       <div id="bulk-actions-pane" style="display: none;">
         <span id="selection-count">0 books selected</span>
         <button id="bulk-delete">Delete</button>
@@ -63,7 +70,7 @@
       <div style="display: inline; position: absolute;
                   font-size: 8pt;
                   right: 2px; top: 0; opacity: 0.3"
-           id="dateStamp">20251019.0830</div>
+           id="dateStamp">20251019.2120</div>
       </div>
     <div id="book-grid"></div>
     <div id="infinite-scroll-trigger" style="height: 50px;"></div>
