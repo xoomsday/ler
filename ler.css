@@ -103,6 +103,17 @@ h1 {
   background-color: #f1f1f1;
 }
 
+#app-menu-options a {
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+}
+
+#app-menu-options a:hover {
+  background-color: #f1f1f1;
+}
+
 .filter-options.show {
   display: block;
 }
@@ -124,6 +135,37 @@ h1 {
 #filters {
   margin-left: 1em;
 }
+
+#sorting select {
+  background-color: #efefef;
+  border: 1px solid #ccc;
+  padding: 0.5em 1em;
+  border-radius: 3px;
+  cursor: pointer;
+  -webkit-appearance: none; /* Remove default browser styling */
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23000000%22%20d%3D%22M287%20197.3L159.9%2069.8c-4.8-4.8-12.5-4.8-17.3%200L5.4%20197.3c-3.6%203.6-4.6%208.7-2.9%2013.4.1%201.1.4%202.2.8%203.2.8%202.2%202.1%204.1%203.8%205.8l12.5%2012.5c1.7%201.7%203.6%203%205.8%203.8%202.2.8%204.5%201.1%206.8%201.1h230.4c2.3%200%204.6-.3%206.8-1.1%202.2-.8%204.1-2.1%205.8-3.8l12.5-12.5c1.7-1.7%203-3.6%203.8-5.8.8-2.2%201.1-4.5%201.1-6.8-.1-4.7-1.2-9.8-4.8-13.4z%22%2F%3E%3C%2Fsvg%3E'); /* Custom arrow */
+  background-repeat: no-repeat;
+  background-position: right 0.7em top 50%;
+  background-size: 0.65em auto;
+  padding-right: 2.5em; /* Make space for the arrow */
+}
+
+#sorting select:hover {
+  background-color: #ddd;
+}
+
+#sorting select::-ms-expand {
+  display: none; /* Hide the default arrow in IE/Edge */
+}
+
+#sorting select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
 
 #sorting {
   margin-left: 1em;

@@ -557,26 +557,12 @@ window.addEventListener('load', async () => {
   // --- New State Filter Dropdown Logic ---
   const stateFilterOptions = document.getElementById('state-filter-options');
   addCallback('state-filter-btn', 'click', (event) => {
-    // Prevent the window click listener from closing it immediately
     event.stopPropagation();
     stateFilterOptions.classList.toggle('show');
   });
 
-  // Close the dropdown if the user clicks outside of it
-  window.addEventListener('click', (event) => {
-    if (!event.target.matches('.filter-btn')) {
-      if (stateFilterOptions.classList.contains('show')) {
-        stateFilterOptions.classList.remove('show');
-      }
-    }
-  });
-
-  // Re-display books when a filter checkbox is changed
-  stateFilterOptions.addEventListener('change', () => displayBooks());
-
   // --- New Tag Filter Dropdown Logic ---
   const tagFilterOptions = document.getElementById('tag-filter-options');
-
   addCallback('tag-filter-btn', 'click', (event) => {
     event.stopPropagation();
     tagFilterOptions.classList.toggle('show');
@@ -585,12 +571,27 @@ window.addEventListener('load', async () => {
   // --- New App Menu Logic ---
   const appMenuOptions = document.getElementById('app-menu-options');
   const importFileInput = document.getElementById('import-progress-file');
-
   addCallback('app-menu-btn', 'click', (event) => {
     event.stopPropagation();
     appMenuOptions.classList.toggle('show');
   });
 
+  // --- Consolidated Click Handler to Close Menus ---
+  window.addEventListener('click', (event) => {
+    if (!event.target.matches('.filter-btn')) {
+      if (stateFilterOptions.classList.contains('show')) {
+        stateFilterOptions.classList.remove('show');
+      }
+      if (tagFilterOptions.classList.contains('show')) {
+        tagFilterOptions.classList.remove('show');
+      }
+      if (appMenuOptions.classList.contains('show')) {
+        appMenuOptions.classList.remove('show');
+      }
+    }
+  });
+
+  // --- Event Listeners for Menu Actions ---
   addCallback('export-progress-menu-item', 'click', (e) => {
     e.preventDefault();
     exportProgress();
@@ -615,18 +616,8 @@ window.addEventListener('load', async () => {
     appMenuOptions.classList.remove('show');
   });
 
-  // We can reuse the window click listener to close this dropdown as well
-  window.addEventListener('click', (event) => {
-    if (!event.target.matches('.filter-btn')) {
-      if (tagFilterOptions.classList.contains('show')) {
-        tagFilterOptions.classList.remove('show');
-      }
-      if (appMenuOptions.classList.contains('show')) {
-        appMenuOptions.classList.remove('show');
-      }
-    }
-  });
-
+  // --- Event Listeners for Filter Changes ---
+  stateFilterOptions.addEventListener('change', () => displayBooks());
   tagFilterOptions.addEventListener('change', () => displayBooks());
   importFileInput.addEventListener('change', importProgress);
 
@@ -634,6 +625,7 @@ window.addEventListener('load', async () => {
 
   // Bulk action event listeners
   addCallback('bulk-cancel', 'click', exitSelectionMode);
+
   addCallback('bulk-delete', 'click', bulkDelete);
   addCallback('bulk-state-change', 'change', bulkUpdateState);
   addCallback('bulk-add-tag', 'change', bulkAddTag);

@@ -92,6 +92,17 @@ body.dark-mode {
   color: #e0e0e0;
 }
 
+.dark-mode #sorting select {
+  background-color: #333;
+  border-color: #555;
+  color: #e0e0e0;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23e0e0e0%22%20d%3D%22M287%20197.3L159.9%2069.8c-4.8-4.8-12.5-4.8-17.3%200L5.4%20197.3c-3.6%203.6-4.6%208.7-2.9%2013.4.1%201.1.4%202.2.8%203.2.8%202.2%202.1%204.1%203.8%205.8l12.5%2012.5c1.7%201.7%203.6%203%205.8%203.8%202.2.8%204.5%201.1%206.8%201.1h230.4c2.3%200%204.6-.3%206.8-1.1%202.2-.8%204.1-2.1%205.8-3.8l12.5-12.5c1.7-1.7%203-3.6%203.8-5.8.8-2.2%201.1-4.5%201.1-6.8-.1-4.7-1.2-9.8-4.8-13.4z%22%2F%3E%3C%2Fsvg%3E'); /* Custom arrow for dark mode */
+}
+
+.dark-mode #sorting select:hover {
+  background-color: #444;
+}
+
 .dark-mode .filter-btn {
   background-color: #333;
   border-color: #555;
@@ -112,6 +123,14 @@ body.dark-mode {
 }
 
 .dark-mode .filter-options label:hover {
+  background-color: #444;
+}
+
+.dark-mode #app-menu-options a {
+  color: #e0e0e0;
+}
+
+.dark-mode #app-menu-options a:hover {
   background-color: #444;
 }
 
