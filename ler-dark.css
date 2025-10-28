@@ -1,52 +1,52 @@
 /* Dark mode styles for LER */
 
 body.dark-mode {
-  background-color: #121212;
-  color: #e0e0e0;
+  background-color: #000;
+  color: #fff;
 }
 
 .dark-mode #book-management,
 .dark-mode #reader-view {
-  background-color: #121212;
-  color: #e0e0e0;
+  background-color: #000;
+  color: #fff;
 }
 
 .dark-mode #top-pane {
-  background-color: #121212;
+  background-color: #000;
 }
 
 .dark-mode .button-like-label,
 .dark-mode #reader-controls button,
 .dark-mode #sorting select {
   background-color: #333;
-  color: #e0e0e0;
+  color: #fff;
   border-color: #555;
 }
 
 .dark-mode .control-pill {
   background-color: #333;
-  color: #e0e0e0;
+  color: #fff;
 }
 
 .dark-mode #book-title-display {
   background-color: #333;
-  color: #e0e0e0;
+  color: #fff;
   padding: 0.2em 0.5em;
   border-radius: 15px;
 }
 
 .dark-mode .book-tile {
-  background-color: #1e1e1e;
+  background-color: #000;
   border-color: #333;
 }
 
 .dark-mode .book-title {
-  color: #e0e0e0;
+  color: #fff;
 }
 
 .dark-mode #toc-overlay {
   background-color: rgba(0, 0, 0, 0.9);
-  color: #e0e0e0;
+  color: #fff;
 }
 
 .dark-mode #toc-overlay a {
@@ -54,12 +54,12 @@ body.dark-mode {
 }
 
 .dark-mode #viewer {
-  background-color: #121212;
+  background-color: #000;
 }
 
 .dark-mode #help-overlay {
-  background-color: #1e1e1e;
-  color: #e0e0e0;
+  background-color: #111;
+  color: #fff;
   border-color: #333;
 }
 
@@ -81,7 +81,7 @@ body.dark-mode {
 }
 
 .dark-mode #bulk-actions-pane {
-  background-color: #1e1e1e;
+  background-color: #111;
   border-bottom-color: #444;
 }
 
@@ -89,13 +89,13 @@ body.dark-mode {
 .dark-mode #bulk-actions-pane select {
   background-color: #333;
   border-color: #555;
-  color: #e0e0e0;
+  color: #fff;
 }
 
 .dark-mode #sorting select {
   background-color: #333;
   border-color: #555;
-  color: #e0e0e0;
+  color: #fff;
   background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23e0e0e0%22%20d%3D%22M287%20197.3L159.9%2069.8c-4.8-4.8-12.5-4.8-17.3%200L5.4%20197.3c-3.6%203.6-4.6%208.7-2.9%2013.4.1%201.1.4%202.2.8%203.2.8%202.2%202.1%204.1%203.8%205.8l12.5%2012.5c1.7%201.7%203.6%203%205.8%203.8%202.2.8%204.5%201.1%206.8%201.1h230.4c2.3%200%204.6-.3%206.8-1.1%202.2-.8%204.1-2.1%205.8-3.8l12.5-12.5c1.7-1.7%203-3.6%203.8-5.8.8-2.2%201.1-4.5%201.1-6.8-.1-4.7-1.2-9.8-4.8-13.4z%22%2F%3E%3C%2Fsvg%3E'); /* Custom arrow for dark mode */
 }
 
@@ -106,7 +106,7 @@ body.dark-mode {
 .dark-mode .filter-btn {
   background-color: #333;
   border-color: #555;
-  color: #e0e0e0;
+  color: #fff;
 }
 
 .dark-mode .filter-btn:hover {
@@ -119,7 +119,7 @@ body.dark-mode {
 }
 
 .dark-mode .filter-options label {
-  color: #e0e0e0;
+  color: #fff;
 }
 
 .dark-mode .filter-options label:hover {
@@ -127,7 +127,7 @@ body.dark-mode {
 }
 
 .dark-mode #app-menu-options a {
-  color: #e0e0e0;
+  color: #fff;
 }
 
 .dark-mode #app-menu-options a:hover {
@@ -135,7 +135,7 @@ body.dark-mode {
 }
 
 .dark-mode #app-menu-options a {
-  color: #e0e0e0;
+  color: #fff;
 }
 
 .dark-mode #app-menu-options a:hover {
