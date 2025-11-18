@@ -1594,11 +1594,10 @@ async function handleFileOpen() {
 
     const promises = fileHandles.map(async (fileHandle) => {
       const file = await fileHandle.getFile();
-      const bookData = await file.arrayBuffer();
       if (file.name.endsWith('.epub')) {
-        return storeBook(file.name, bookData);
+        return storeBook(file);
       } else if (file.name.endsWith('.cbz')) {
-        return storeComicBook(file.name, bookData);
+        return storeComicBook(file);
       } else {
         console.warn(`Unsupported file type: ${file.name}`);
       }
@@ -1622,9 +1621,11 @@ async function calculateSha256Hash(data) {
   return `SHA-256:${hexHash}`;
 }
 
-function storeBook(name, data) {
+function storeBook(file) {
   return new Promise(async (resolve, reject) => {
     try {
+      const name = file.name;
+      const data = await file.arrayBuffer();
       const bookInstance = ePub(data);
       const coverUrl = await bookInstance.coverUrl();
       let coverImage = null;
@@ -1669,9 +1670,11 @@ function storeBook(name, data) {
   });
 }
 
-async function storeComicBook(name, data) {
+async function storeComicBook(file) {
   return new Promise(async (resolve, reject) => {
     try {
+      const name = file.name;
+      const data = await file.arrayBuffer();
       const zip = await JSZip.loadAsync(data);
       const imageFiles = Object.values(zip.files).filter(file =>
         !file.dir && /\.(jpe?g|png|gif|webp)$/i.test(file.name)
