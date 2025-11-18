@@ -497,7 +497,8 @@ window.addEventListener('load', async () => {
   displayBooks();
   startBackgroundHashMigration(); // Start background hashing
 
-  addCallback('epub-upload', 'change', handleFileUpload);
+
+  addCallback('open-file-button', 'click', handleFileOpen);
   addCallback('close-reader', 'click', closeReader);
   addCallback('toc-button', 'click', toggleToc);
   addCallback('bookmark-button', 'click', toggleBookmarksOverlay);
@@ -1572,44 +1573,45 @@ async function handleKeyPress(event) {
   }
 }
 
-async function handleFileUpload(event) {
-  const files = event.target.files;
-  if (!files.length) {
+async function handleFileOpen() {
+  if (!window.showOpenFilePicker) {
+    alert('File System Access API is not supported in this browser.');
     return;
   }
 
-  const promises = [];
-  for (const file of files) {
-    const promise = new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const bookData = e.target.result;
-        if (file.name.endsWith('.epub')) {
-          storeBook(file.name, bookData).then(resolve).catch(reject);
-        } else if (file.name.endsWith('.cbz')) {
-          storeComicBook(file.name, bookData).then(resolve).catch(reject);
-        } else {
-          // Optional: handle unsupported file types
-          console.warn(`Unsupported file type: ${file.name}`);
-          resolve(); // Resolve to not block other uploads
-        }
-      };
-      reader.onerror = (e) => {
-        reject(new Error(`Error reading file: ${file.name}`));
-      };
-      reader.readAsArrayBuffer(file);
-    });
-    promises.push(promise);
-  }
-
   try {
+    const fileHandles = await window.showOpenFilePicker({
+      multiple: true,
+      types: [{
+        description: 'Books',
+        accept: {
+          'application/epub+zip': ['.epub'],
+          'application/vnd.comicbook+zip': ['.cbz'],
+          'application/x-cbz': ['.cbz'],
+        }
+      }]
+    });
+
+    const promises = fileHandles.map(async (fileHandle) => {
+      const file = await fileHandle.getFile();
+      const bookData = await file.arrayBuffer();
+      if (file.name.endsWith('.epub')) {
+        return storeBook(file.name, bookData);
+      } else if (file.name.endsWith('.cbz')) {
+        return storeComicBook(file.name, bookData);
+      } else {
+        console.warn(`Unsupported file type: ${file.name}`);
+      }
+    });
+
     await Promise.all(promises);
     displayBooks();
-    // Reset the input so the user can upload the same file again
-    event.target.value = null;
-  } catch (error) {
-    console.error("An error occurred during file upload:", error);
-    // Optionally, display an error message to the user
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      // User cancelled the file picker
+      return;
+    }
+    console.error('Error opening files:', err);
   }
 }
 
