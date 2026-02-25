@@ -1393,9 +1393,18 @@ async function nextEpubPage(skipSave = false) {
     const prelocation = currentRendition.currentLocation();
     const preStart = prelocation.start;
     const preEnd = prelocation.end;
+
     await currentRendition.next();
+
+    // A small delay to allow the layout engine to settle.
+    // This helps in some browsers where currentLocation() might
+    // return the old value immediately after next() resolves.
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     const { start, end } = currentRendition.currentLocation();
 
+    // Stuck detection: If the location hasn't changed, we are likely at a boundary
+    // that epub.js cannot cross automatically due to rounding errors.
     if (preStart.cfi === start.cfi && preEnd.cfi === end.cfi) {
       const currentSection = currentRendition.manager.views.last().section;
       const nextSection = currentSection.next();
