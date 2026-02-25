@@ -1256,24 +1256,36 @@ async function gotoCFI(cfi) {
   isNavigating = true;
   try {
     // First, display the section. This may not be the exact page.
-    // We use display() with a CFI, which epub.js handles as a jump.
     await currentRendition.display(cfi);
 
-    // Now, loop until we are at the correct page or slightly past it.
+    // Now, loop until the target CFI is within the current visible range.
     // We pass skipSave=true to avoid dozens of DB writes.
+    let lastCFI = null;
     for (let i = 0; i < 50; i++) {
       const currentLocation = currentRendition.currentLocation();
-      if (!currentLocation || !currentLocation.start) {
+      if (!currentLocation || !currentLocation.start || !currentLocation.end) {
         break;
       }
-      const currentCFI = currentLocation.start.cfi;
-      const comparison = currentRendition.epubcfi.compare(cfi, currentCFI);
+      const startCFI = currentLocation.start.cfi;
+      const endCFI = currentLocation.end.cfi;
 
-      if (comparison > 0) {
-        // The target CFI is still ahead of us.
+      // Detect if we are stuck on the same page
+      if (lastCFI === startCFI) {
+        break;
+      }
+      lastCFI = startCFI;
+
+      const compareStart = currentRendition.epubcfi.compare(cfi, startCFI);
+      const compareEnd = currentRendition.epubcfi.compare(cfi, endCFI);
+
+      if (compareStart < 0) {
+        // The target is before the current page.
+        await prevEpubPage(true);
+      } else if (compareEnd > 0) {
+        // The target is after the current page.
         await nextEpubPage(true);
       } else {
-        // We have arrived at or moved just past the target CFI. Stop.
+        // The target is on the current page (start <= cfi <= end).
         break;
       }
     }
