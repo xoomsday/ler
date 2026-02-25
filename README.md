@@ -194,6 +194,37 @@ are not yet implemented.
     `page-progression-direction` and `writing-mode` (e.g.,
     vertical-rl) CSS attributes are not yet implemented.
 
+### Potential Reader Improvements (Technical Debt)
+
+These are technical refinements to improve the robustness and
+performance of the reader, addressing limitations in the underlying
+libraries and APIs.
+
+#### EPUB Navigation
+*   **Performance**: Suppress redundant IndexedDB writes during
+    navigation loops (e.g., in `gotoCFI`).
+*   **Accuracy**: Implement bidirectional correction in `gotoCFI` to
+    handle page overshoots.
+*   **Stability**: Add a navigation lock or debounce to prevent race
+    conditions during rapid slider movements.
+*   **Robustness**: Refine boundary detection in `nextEpubPage` to
+    handle `epub.js` section transition bugs more reliably.
+
+#### Text-to-Speech (TTS)
+*   **Granular Control**: Add controls for speech rate, pitch, and voice
+    selection.
+*   **Robustness**: Implement better text chunking (e.g., by paragraph
+    or sentence) to prevent browser-specific buffer limits from cutting
+    off long pages.
+*   **Visual Feedback**: Add word or sentence-level highlighting as the
+    text is read.
+*   **Interactive Navigation**: Implement "Read from here" by clicking
+    or tapping on a specific paragraph.
+*   **Ruby/Furigana MRU Cache**: Maintain an MRU cache of words with
+    their pronunciations (from `<rt>` tags) to automatically apply the
+    correct reading to the same words when they appear later in the
+    text without `<rt>` tags.
+
 ## Technology Stack
 
 *   **Frontend**: Vanilla JavaScript (ES6+), HTML5, CSS3
