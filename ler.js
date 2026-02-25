@@ -98,22 +98,68 @@ function removeMouseHandlers(element) {
   element.removeEventListener('mousemove', showControls);
 }
 
+let rubyMRUCache = new Map();
+const MAX_RUBY_CACHE_SIZE = 200;
+
+function updateRubyCache(base, pronunciation) {
+  if (!base || !pronunciation) return;
+  // Move to end to maintain MRU order
+  rubyMRUCache.delete(base);
+  rubyMRUCache.set(base, pronunciation);
+
+  if (rubyMRUCache.size > MAX_RUBY_CACHE_SIZE) {
+    const firstKey = rubyMRUCache.keys().next().value;
+    rubyMRUCache.delete(firstKey);
+  }
+}
+
 function extractReadableText(bodyElement) {
   const clonedBody = bodyElement.cloneNode(true);
   const rubies = clonedBody.querySelectorAll('ruby');
+
   rubies.forEach(ruby => {
+    // 1. Get base text (everything inside <ruby> except <rt> and <rp>)
+    const rubyClone = ruby.cloneNode(true);
+    rubyClone.querySelectorAll('rt, rp').forEach(e => e.remove());
+    const baseText = rubyClone.textContent.trim();
+
+    // 2. Get pronunciation from <rt>
     const rts = ruby.querySelectorAll('rt');
     let pronunciation = '';
     rts.forEach(rt => {
       pronunciation += rt.textContent;
     });
-    // Replace the ruby element with a text node containing the pronunciation
-    if (pronunciation) {
-      ruby.parentNode
-        .replaceChild(bodyElement.ownerDocument.createTextNode(pronunciation), ruby);
+    pronunciation = pronunciation.trim();
+
+    if (pronunciation && baseText) {
+      updateRubyCache(baseText, pronunciation);
+      // Replace the ruby element with the pronunciation for reading
+      ruby.parentNode.replaceChild(
+        bodyElement.ownerDocument.createTextNode(pronunciation),
+        ruby
+      );
     }
   });
-  return clonedBody.textContent;
+
+  let text = clonedBody.textContent;
+
+  // 3. Apply cache for words that don't have ruby tags in this specific instance.
+  // We sort by length descending to ensure we match the longest substring first.
+  const sortedBases = Array.from(rubyMRUCache.keys())
+    .sort((a, b) => b.length - a.length);
+
+  for (const base of sortedBases) {
+    if (base.length === 0) continue;
+    const pronunciation = rubyMRUCache.get(base);
+    // Escape base for regex and replace all occurrences.
+    // We only replace if the base is not already part of a larger word
+    // that might be replaced later (handled by length sorting).
+    const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedBase, 'g');
+    text = text.replace(regex, pronunciation);
+  }
+
+  return text;
 }
 
 function extractBaseText(bodyElement) {
@@ -187,33 +233,99 @@ async function getCurrentPageText() {
   }
 }
 
+let currentChunks = [];
+let currentChunkIndex = 0;
+
+function chunkText(text) {
+  if (!text) return [];
+  // Split by common sentence delimiters while keeping the delimiter.
+  // Handles both Western (.!?) and CJK (。！？) punctuation.
+  const parts = text.split(/([。！？.!?\n])/);
+  const chunks = [];
+  let currentChunk = "";
+
+  for (let i = 0; i < parts.length; i++) {
+    currentChunk += parts[i];
+    // If the part is a delimiter or if the chunk is getting quite long,
+    // push it and start a new one.
+    if (parts[i].match(/[。！？.!?\n]/) || currentChunk.length > 200) {
+      if (currentChunk.trim().length > 0) {
+        chunks.push(currentChunk.trim());
+      }
+      currentChunk = "";
+    }
+  }
+  if (currentChunk.trim().length > 0) {
+    chunks.push(currentChunk.trim());
+  }
+  return chunks;
+}
+
+function updateTTSRate(newRate) {
+  ttsRate = Math.max(0.1, Math.min(10, parseFloat(newRate.toFixed(1))));
+  document.getElementById('tts-rate-value').textContent = ttsRate.toFixed(1);
+  localStorage.setItem('ler-tts-rate', ttsRate);
+  // If speaking, restart to apply new rate
+  if (isAutoReading) {
+    if (synth) synth.cancel();
+    readCurrentPage();
+  }
+}
+
+function updateTTSPitch(newPitch) {
+  ttsPitch = Math.max(0, Math.min(2, parseFloat(newPitch.toFixed(1))));
+  document.getElementById('tts-pitch-value').textContent = ttsPitch.toFixed(1);
+  localStorage.setItem('ler-tts-pitch', ttsPitch);
+  // If speaking, restart to apply new pitch
+  if (isAutoReading) {
+    if (synth) synth.cancel();
+    readCurrentPage();
+  }
+}
+
 async function readCurrentPage() {
   if (!currentRendition || !isAutoReading) return;
 
-  const text = await getCurrentPageText();
-  if (!text || text.trim() === '') {
-    // If page is blank, just go to the next one
-    if (isAutoReading) {
-      await nextEpubPage();
-      readCurrentPage();
+  if (currentChunks.length === 0 || currentChunkIndex >= currentChunks.length) {
+    const text = await getCurrentPageText();
+    currentChunks = chunkText(text);
+    currentChunkIndex = 0;
+
+    if (currentChunks.length === 0) {
+      // If page is blank, just go to the next one
+      if (isAutoReading) {
+        await nextEpubPage();
+        // The relocated event will handle clearing/resetting if needed,
+        // but for auto-reading we just call it again.
+        setTimeout(readCurrentPage, 250);
+      }
+      return;
     }
-    return;
   }
 
-  console.log('lang: ', currentBookLanguage);
-
+  const text = currentChunks[currentChunkIndex];
   currentUtterance = new SpeechSynthesisUtterance(text);
-  currentUtterance.lang = currentBookLanguage; // Set the language for the utterance
+  currentUtterance.lang = currentBookLanguage;
+  currentUtterance.rate = ttsRate;
+  currentUtterance.pitch = ttsPitch;
+
   currentUtterance.onend = async () => {
     if (isAutoReading) {
-      await nextEpubPage();
-      // A small delay to allow the next page to render before reading
-      setTimeout(readCurrentPage, 250);
+      currentChunkIndex++;
+      if (currentChunkIndex < currentChunks.length) {
+        // Read next chunk on same page
+        readCurrentPage();
+      } else {
+        // Page finished, go to next
+        await nextEpubPage();
+        // A small delay to allow the next page to render before reading
+        setTimeout(readCurrentPage, 250);
+      }
     }
   };
+
   currentUtterance.onerror = (event) => {
     console.error('SpeechSynthesisUtterance.onerror', event);
-    // Stop auto-reading on error
     stopReading();
   };
 
@@ -262,6 +374,8 @@ function stopReading() {
     synth.cancel();
   }
   currentUtterance = null;
+  currentChunks = [];
+  currentChunkIndex = 0;
 
   elementStyle('tts-play').display = 'inline-block';
   elementStyle('tts-pause').display = 'none';
@@ -497,6 +611,11 @@ window.addEventListener('load', async () => {
   displayBooks();
   startBackgroundHashMigration(); // Start background hashing
 
+  const savedRate = localStorage.getItem('ler-tts-rate');
+  if (savedRate) updateTTSRate(parseFloat(savedRate));
+
+  const savedPitch = localStorage.getItem('ler-tts-pitch');
+  if (savedPitch) updateTTSPitch(parseFloat(savedPitch));
 
   addCallback('open-file-button', 'click', handleFileOpen);
   addCallback('close-reader', 'click', closeReader);
@@ -515,6 +634,11 @@ window.addEventListener('load', async () => {
   addCallback('tts-play', 'click', togglePlayPause);
   addCallback('tts-pause', 'click', togglePlayPause);
   addCallback('tts-stop', 'click', stopReading);
+
+  addCallback('tts-rate-up', 'click', () => updateTTSRate(ttsRate + 0.1));
+  addCallback('tts-rate-down', 'click', () => updateTTSRate(ttsRate - 0.1));
+  addCallback('tts-pitch-up', 'click', () => updateTTSPitch(ttsPitch + 0.1));
+  addCallback('tts-pitch-down', 'click', () => updateTTSPitch(ttsPitch - 0.1));
 
   window.addEventListener('resize', () => {
     if (currentBookType === 'cbz' &&
@@ -3246,6 +3370,11 @@ function openRendition(bookData, metadata) {
       }
 
       if (!isNavigating) {
+        // Reset TTS chunks when user manually relocates
+        if (!isAutoReading) {
+          currentChunks = [];
+          currentChunkIndex = 0;
+        }
         saveLastLocation();
       }
     });
