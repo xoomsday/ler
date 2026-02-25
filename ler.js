@@ -1251,31 +1251,37 @@ async function generateBookmarksList() {
 }
 
 async function gotoCFI(cfi) {
-  if (!currentRendition) return;
+  if (!currentRendition || isNavigating) return;
 
-  // First, display the section. This may not be the exact page.
-  await currentRendition.display(cfi);
+  isNavigating = true;
+  try {
+    // First, display the section. This may not be the exact page.
+    // We use display() with a CFI, which epub.js handles as a jump.
+    await currentRendition.display(cfi);
 
-  // Now, loop until we are at the correct page or slightly past it.
-  // A safety break is included to prevent infinite loops.
-  for (let i = 0; i < 50; i++) {
-    const currentLocation = currentRendition.currentLocation();
-    if (!currentLocation || !currentLocation.start) {
-      return;
+    // Now, loop until we are at the correct page or slightly past it.
+    // We pass skipSave=true to avoid dozens of DB writes.
+    for (let i = 0; i < 50; i++) {
+      const currentLocation = currentRendition.currentLocation();
+      if (!currentLocation || !currentLocation.start) {
+        break;
+      }
+      const currentCFI = currentLocation.start.cfi;
+      const comparison = currentRendition.epubcfi.compare(cfi, currentCFI);
+
+      if (comparison > 0) {
+        // The target CFI is still ahead of us.
+        await nextEpubPage(true);
+      } else {
+        // We have arrived at or moved just past the target CFI. Stop.
+        break;
+      }
     }
-    const currentCFI = currentLocation.start.cfi;
-    const comparison = currentRendition.epubcfi.compare(cfi, currentCFI);
-
-    if (comparison > 0) {
-      // The target CFI is still ahead of us. Go to the next page and wait.
-      await nextEpubPage();
-    } else {
-      // We have arrived at or moved just past the target CFI. Stop.
-      return;
-    }
+    // Perform a single save after the final position is reached.
+    await saveLastLocation();
+  } finally {
+    isNavigating = false;
   }
-
-  console.warn('gotoCFI exited due to safety break.');
 }
 
 async function addNewBookmark() {
@@ -1363,32 +1369,52 @@ async function deleteBookmark(bookmarkId) {
   });
 }
 
-async function nextEpubPage() {
-  if (!currentRendition) return;
+let isNavigating = false;
 
-  let setFinished = false;
-  const prelocation = currentRendition.currentLocation();
-  const preStart = prelocation.start;
-  const preEnd = prelocation.end;
-  await currentRendition.next();
-  const { start, end } = currentRendition.currentLocation();
+async function nextEpubPage(skipSave = false) {
+  if (!currentRendition || (isNavigating && !skipSave)) return;
 
-  if (preStart.cfi === start.cfi && preEnd.cfi === end.cfi) {
-    const currentSection = currentRendition.manager.views.last().section;
-    const nextSection = currentSection.next();
-    if (nextSection) {
-      await currentRendition.display(nextSection.href);
-    } else {
-      setFinished = true;
+  const originalNavigating = isNavigating;
+  isNavigating = true;
+  try {
+    let setFinished = false;
+    const prelocation = currentRendition.currentLocation();
+    const preStart = prelocation.start;
+    const preEnd = prelocation.end;
+    await currentRendition.next();
+    const { start, end } = currentRendition.currentLocation();
+
+    if (preStart.cfi === start.cfi && preEnd.cfi === end.cfi) {
+      const currentSection = currentRendition.manager.views.last().section;
+      const nextSection = currentSection.next();
+      if (nextSection) {
+        await currentRendition.display(nextSection.href);
+      } else {
+        setFinished = true;
+      }
     }
-  }
 
-  await saveLastLocation(setFinished);
+    if (!skipSave) {
+      await saveLastLocation(setFinished);
+    }
+  } finally {
+    isNavigating = originalNavigating;
+  }
 }
 
-async function prevEpubPage() {
-  if (!currentRendition) return;
-  await currentRendition.prev();
+async function prevEpubPage(skipSave = false) {
+  if (!currentRendition || (isNavigating && !skipSave)) return;
+
+  const originalNavigating = isNavigating;
+  isNavigating = true;
+  try {
+    await currentRendition.prev();
+    if (!skipSave) {
+      await saveLastLocation();
+    }
+  } finally {
+    isNavigating = originalNavigating;
+  }
 }
 
 async function nextCbzPage() {
@@ -3197,7 +3223,10 @@ function openRendition(bookData, metadata) {
           currentRendition.spread('auto');
         }
       }
-      saveLastLocation();
+
+      if (!isNavigating) {
+        saveLastLocation();
+      }
     });
 
     currentRendition.on('rendered', () => {
