@@ -87,6 +87,15 @@ the browser's IndexedDB.
     *   **Remembers Your Place**: The application automatically saves
       your last reading position on every page turn and returns you to
       it when you reopen a book.
+    *   **Enhanced Navigation (EPUB)**:
+        *   **Navigation Lock**: Prevents race conditions during rapid
+          navigation.
+        *   **Performance Optimized**: Suppresses redundant IndexedDB
+          writes during multi-step navigation (e.g., slider jumps).
+        *   **High Accuracy**: Bidirectional correction ensures jumps
+          land exactly on the target page.
+        *   **Robust Section Transitions**: Specialized handling for
+          chapter boundaries to overcome library limitations.
     *   **Per-Book Display Settings**:
         *   **For EPUBs**: Font size, line height, and font face
           (serif/sans-serif) are saved for each book individually.
@@ -122,9 +131,15 @@ the browser's IndexedDB.
           content of this screen is context-aware, showing only the
           shortcuts relevant to the current view (EPUB or CBZ).
     *   **Text-to-Speech (TTS)**:
-        *   Read the current page's text aloud.
-        *   Play, pause, and stop controls for TTS.
-        *   Automatically turns to the next page and continues reading.
+        *   **Granular Control**: Adjust speech rate and pitch to suit
+          your preference.
+        *   **Robust Reading**: Uses intelligent text chunking to avoid
+          browser buffer limits on long pages.
+        *   **Automatic Page Turning**: Automatically turns to the next
+          page and continues reading seamlessly.
+        *   **Ruby/Furigana Support**: Intelligently handles `<ruby>`
+          tags and maintains a cache to remember pronunciations for
+          words even when omitted in later occurrences.
     *   **Keyboard Navigation**:
         *   **For All Views**:
             *   `ArrowLeft` / `ArrowRight`: Navigate between pages.
@@ -176,12 +191,14 @@ the browser's IndexedDB.
     adjust font size, line height, and font face, or use the
     corresponding keyboard shortcuts (`+`/`-`/`[`/`]`/`f`). Press `0`
     to reset.
-9.  **Adjust Display (Comic)**: Use the on-screen pill controls to
+9.  **Adjust TTS**: Use the controls in the TTS pill to adjust speech
+    rate and pitch.
+10. **Adjust Display (Comic)**: Use the on-screen pill controls to
     toggle reading direction (LTR/RTL) or to split/rejoin two-page
     spreads. Use the `d` and `s` keys for the same actions.
-10. **Use TOC/Bookmarks (EPUB)**: Click the `☰` (Table of Contents) or
+11. **Use TOC/Bookmarks (EPUB)**: Click the `☰` (Table of Contents) or
     `🔖` (Bookmark) buttons to access those features.
-11. **Close the Book**: Click the `X` button to return to the book
+12. **Close the Book**: Click the `X` button to return to the book
     grid. Your position will be saved.
 
 ## Planned and Missing Features
@@ -201,29 +218,14 @@ performance of the reader, addressing limitations in the underlying
 libraries and APIs.
 
 #### EPUB Navigation
-*   **Performance**: Suppress redundant IndexedDB writes during
-    navigation loops (e.g., in `gotoCFI`).
-*   **Accuracy**: Implement bidirectional correction in `gotoCFI` to
-    handle page overshoots.
-*   **Stability**: Add a navigation lock or debounce to prevent race
-    conditions during rapid slider movements.
-*   **Robustness**: Refine boundary detection in `nextEpubPage` to
-    handle `epub.js` section transition bugs more reliably.
+(Completed: Performance, Accuracy, Stability, Robustness)
 
 #### Text-to-Speech (TTS)
-*   **Granular Control**: Add controls for speech rate, pitch, and voice
-    selection.
-*   **Robustness**: Implement better text chunking (e.g., by paragraph
-    or sentence) to prevent browser-specific buffer limits from cutting
-    off long pages.
+(Completed: Granular Control, Robustness, Ruby/Furigana MRU Cache)
 *   **Visual Feedback**: Add word or sentence-level highlighting as the
     text is read.
 *   **Interactive Navigation**: Implement "Read from here" by clicking
     or tapping on a specific paragraph.
-*   **Ruby/Furigana MRU Cache**: Maintain an MRU cache of words with
-    their pronunciations (from `<rt>` tags) to automatically apply the
-    correct reading to the same words when they appear later in the
-    text without `<rt>` tags.
 
 ## Technology Stack
 
