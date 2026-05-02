@@ -682,14 +682,12 @@ window.addEventListener('load', async () => {
   // --- New State Filter Dropdown Logic ---
   const stateFilterOptions = document.getElementById('state-filter-options');
   addCallback('state-filter-btn', 'click', (event) => {
-    event.stopPropagation();
     stateFilterOptions.classList.toggle('show');
   });
 
   // --- New Tag Filter Dropdown Logic ---
   const tagFilterOptions = document.getElementById('tag-filter-options');
   addCallback('tag-filter-btn', 'click', (event) => {
-    event.stopPropagation();
     tagFilterOptions.classList.toggle('show');
   });
 
@@ -697,13 +695,15 @@ window.addEventListener('load', async () => {
   const appMenuOptions = document.getElementById('app-menu-options');
   const importFileInput = document.getElementById('import-progress-file');
   addCallback('app-menu-btn', 'click', (event) => {
-    event.stopPropagation();
     appMenuOptions.classList.toggle('show');
   });
 
   // --- Consolidated Click Handler to Close Menus ---
   window.addEventListener('click', (event) => {
-    if (!event.target.matches('.filter-btn')) {
+    const isFilterBtn = event.target.closest('.filter-btn');
+    const isInsideFilterOptions = event.target.closest('.filter-options');
+
+    if (!isFilterBtn && !isInsideFilterOptions) {
       if (stateFilterOptions.classList.contains('show')) {
         stateFilterOptions.classList.remove('show');
       }
@@ -711,6 +711,17 @@ window.addEventListener('load', async () => {
         tagFilterOptions.classList.remove('show');
       }
       if (appMenuOptions.classList.contains('show')) {
+        appMenuOptions.classList.remove('show');
+      }
+    } else if (isFilterBtn) {
+      // If clicking a filter button, close OTHER menus
+      if (isFilterBtn.id !== 'state-filter-btn' && stateFilterOptions.classList.contains('show')) {
+        stateFilterOptions.classList.remove('show');
+      }
+      if (isFilterBtn.id !== 'tag-filter-btn' && tagFilterOptions.classList.contains('show')) {
+        tagFilterOptions.classList.remove('show');
+      }
+      if (isFilterBtn.id !== 'app-menu-btn' && appMenuOptions.classList.contains('show')) {
         appMenuOptions.classList.remove('show');
       }
     }
@@ -780,6 +791,16 @@ async function populateTagFilter() {
   tags.sort((a, b) => a.name.localeCompare(b.name));
 
   populateBulkTagDropdowns(tags); // New call to populate bulk dropdowns
+
+  if (tags.length === 0) {
+    const message = document.createElement('div');
+    message.style.padding = '12px 16px';
+    message.style.color = '#888';
+    message.style.fontSize = '0.9em';
+    message.textContent = 'No tags created yet.';
+    optionsContainer.appendChild(message);
+    return;
+  }
 
   tags.forEach(tag => {
     const label = document.createElement('label');
@@ -2057,6 +2078,7 @@ async function addNewTagFromInput() {
     tagEditorState.allTags.push({ id: newTagId, name: tagName });
     tagEditorState.currentTagIds.add(newTagId);
     input.value = '';
+    populateTagFilter(); // Refresh the filter dropdown
     renderTagsInEditor();
   };
 }
@@ -2098,23 +2120,6 @@ function closeTagEditor() {
   elementStyle('tag-editor-overlay').display = 'none';
   tagEditorState = { bookId: null, currentTagIds: new Set(), allTags: [] };
 }
-
-// Hook up tag editor event listeners in the main load event
-window.addEventListener('load', async () => {
-  // ... (existing load event code)
-
-  // Tag Editor buttons
-  addCallback('tag-editor-cancel', 'click', closeTagEditor);
-  addCallback('tag-editor-save', 'click', saveBookTags);
-  addCallback('add-tag-btn', 'click', addNewTagFromInput);
-  addCallback('new-tag-name', 'keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addNewTagFromInput();
-    }
-  });
-});
-
 
 async function downloadBook(bookId) {
   try {
