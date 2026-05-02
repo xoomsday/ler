@@ -35,7 +35,16 @@ let ttsPitch = 1.0;
 let isSelectionModeActive = false;
 let selectedBookIds = new Set();
 let forceSimpleNext = true;
-let coverObserver = null;
+let coverObserver = new IntersectionObserver((entries, observer) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const img = entry.target;
+      img.src = img.dataset.src;
+      img.classList.remove('lazy');
+      observer.unobserve(img);
+    }
+  });
+});
 let currentBookOffset = 0;
 const BOOKS_PER_PAGE = 20;
 let isLoadingBooks = false;
@@ -46,27 +55,17 @@ const MAX_RUBY_CACHE_SIZE = 200;
 let currentChunks = [];
 let currentChunkIndex = 0;
 
-function setupCoverObserver() {
-  coverObserver = new IntersectionObserver((entries, observer) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const img = entry.target;
-        img.src = img.dataset.src;
-        img.classList.remove('lazy');
-        observer.unobserve(img);
-      }
-    });
-  });
-}
-
 function setupScrollObserver() {
   const trigger = document.getElementById('infinite-scroll-trigger');
+  const bookGrid = document.getElementById('book-grid');
   const scrollObserver = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting && !isLoadingBooks) {
-      isLoadingBooks = true;
       displayBooks(true); // Pass true to append books
     }
-  }, { threshold: 0.1 });
+  }, {
+    root: bookGrid,
+    threshold: 0.1
+  });
   scrollObserver.observe(trigger);
 }
 
@@ -609,7 +608,7 @@ window.addEventListener('load', async () => {
 
   await initDB();
   await migrateBookmarksFromLocalStorage();
-  displayBooks();
+  await displayBooks();
   startBackgroundHashMigration(); // Start background hashing
 
   const savedRate = localStorage.getItem('ler-tts-rate');
@@ -767,7 +766,6 @@ window.addEventListener('load', async () => {
       addNewTagFromInput();
     }
   });
-  setupCoverObserver();
   setupScrollObserver();
 });
 
@@ -2635,297 +2633,319 @@ function updateBookState(bookId, state, shouldRefresh = true) {
 
 
 function displayBooks(append = false) {
-  const bookGrid = document.getElementById('book-grid');
-  if (!append) {
-    currentBookOffset = 0;
-    while (bookGrid.firstChild) {
-      bookGrid.removeChild(bookGrid.firstChild);
-    }
-  }
-  isLoadingBooks = true;
+  return new Promise((resolve, reject) => {
+    const bookGrid = document.getElementById('book-grid');
+    const trigger = document.getElementById('infinite-scroll-trigger');
 
-
-  const transaction =
-        db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME, STORE_BOOK_TAGS_NAME],
-                       'readonly');
-  const store = transaction.objectStore(STORE_BOOKS_NAME);
-  const request = store.getAll();
-
-  request.onsuccess = async () => {
-    const books = request.result;
-    const metadataTransaction = db.transaction([STORE_METADATA_NAME], 'readonly');
-    const metadataStore = metadataTransaction.objectStore(STORE_METADATA_NAME);
-    const metadataRequest = metadataStore.getAll();
-
-    metadataRequest.onsuccess = async () => {
-      const metadataResults = metadataRequest.result;
-      const metadataMap = new Map(metadataResults.map(m => [m.bookId, m]));
-
-      // --- State Filtering ---
-      const filterStateCheckboxes =
-            document.querySelectorAll('#state-filter-options input[name="state"]');
-      const activeStateFilters = [...filterStateCheckboxes]
-            .filter(cb => cb.checked).map(cb => cb.value);
-
-      // --- Tag Filtering ---
-      const filterTagCheckboxes =
-            document.querySelectorAll('#tag-filter-options input[name="tag"]');
-      const activeTagFilters = [...filterTagCheckboxes]
-            .filter(cb => cb.checked).map(cb => parseInt(cb.value, 10));
-
-      let booksMatchingTags = null;
-      if (activeTagFilters.length > 0) {
-        const bookTagsTx = db.transaction([STORE_BOOK_TAGS_NAME], 'readonly');
-        const bookTagsStore = bookTagsTx.objectStore(STORE_BOOK_TAGS_NAME);
-        booksMatchingTags = new Set();
-
-        for (const tagId of activeTagFilters) {
-          const tagIndex = bookTagsStore.index('by_tagId');
-          const booksForTag =
-                await new Promise(resolve => tagIndex
-                                  .getAll(tagId).onsuccess =
-                                  e => resolve(e.target.result));
-          booksForTag.forEach(bookTag => {
-            booksMatchingTags.add(bookTag.bookId);
-          });
+    if (!append) {
+      currentBookOffset = 0;
+      // Clear all children except the trigger
+      const children = Array.from(bookGrid.children);
+      children.forEach(child => {
+        if (child !== trigger) {
+          bookGrid.removeChild(child);
         }
-      }
-
-      const filteredBooks = books.filter(book => {
-        const meta = metadataMap.get(book.id);
-        // State filter check
-        if (!meta || !activeStateFilters.includes(meta.state)) {
-          return false;
-        }
-        // Tag filter check
-        if (booksMatchingTags && !booksMatchingTags.has(book.id)) {
-          return false;
-        }
-        return true;
       });
+    }
+    isLoadingBooks = true;
 
-      const sortBy = document.getElementById('sort-by').value;
-      if (sortBy === 'title') {
-        filteredBooks
-          .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-      } else if (sortBy === 'last-read') {
-        filteredBooks.sort((a, b) => {
-          const metaA = metadataMap.get(a.id);
-          const metaB = metadataMap.get(b.id);
-          const timeA = metaA ? metaA.lastReadTimestamp || 0 : 0;
-          const timeB = metaB ? metaB.lastReadTimestamp || 0 : 0;
-          return timeB - timeA;
-        });
-      }
+    const transaction =
+          db.transaction([STORE_BOOKS_NAME, STORE_METADATA_NAME, STORE_BOOK_TAGS_NAME],
+                         'readonly');
+    const store = transaction.objectStore(STORE_BOOKS_NAME);
+    const request = store.getAll();
 
-      const booksToDisplay =
-            filteredBooks.slice(currentBookOffset, currentBookOffset + BOOKS_PER_PAGE);
+    request.onsuccess = async () => {
+      const books = request.result;
+      const metadataTransaction = db.transaction([STORE_METADATA_NAME], 'readonly');
+      const metadataStore = metadataTransaction.objectStore(STORE_METADATA_NAME);
+      const metadataRequest = metadataStore.getAll();
 
-      if (booksToDisplay.length === 0 && currentBookOffset === 0) {
-        bookGrid.innerHTML = '<p>No books match the current filters.</p>';
-        isLoadingBooks = false;
-        return;
-      }
+      metadataRequest.onsuccess = async () => {
+        const metadataResults = metadataRequest.result;
+        const metadataMap = new Map(metadataResults.map(m => [m.bookId, m]));
 
-      booksToDisplay.forEach((book) => {
-        const tile = document.createElement('div');
-        tile.className = 'book-tile';
-        tile.dataset.bookId = book.id;
+        // --- State Filtering ---
+        const filterStateCheckboxes =
+              document.querySelectorAll('#state-filter-options input[name="state"]');
+        const activeStateFilters = [...filterStateCheckboxes]
+              .filter(cb => cb.checked).map(cb => cb.value);
 
-        // --- Selection Logic ---
-        let pressTimer;
+        // --- Tag Filtering ---
+        const filterTagCheckboxes =
+              document.querySelectorAll('#tag-filter-options input[name="tag"]');
+        const activeTagFilters = [...filterTagCheckboxes]
+              .filter(cb => cb.checked).map(cb => parseInt(cb.value, 10));
 
-        const startPress = (e) => {
-          if (isSelectionModeActive) return;
-          pressTimer = setTimeout(() => {
-            e.preventDefault();
-            enterSelectionMode();
-          }, 500); // 500ms for long press
-        };
+        let booksMatchingTags = null;
+        if (activeTagFilters.length > 0) {
+          const bookTagsTx = db.transaction([STORE_BOOK_TAGS_NAME], 'readonly');
+          const bookTagsStore = bookTagsTx.objectStore(STORE_BOOK_TAGS_NAME);
+          booksMatchingTags = new Set();
 
-        const cancelPress = () => {
-          clearTimeout(pressTimer);
-        };
-
-        tile.addEventListener('mousedown', startPress);
-        tile.addEventListener('mouseup', cancelPress);
-        tile.addEventListener('mouseleave', cancelPress);
-        tile.addEventListener('touchstart', startPress);
-        tile.addEventListener('touchend', cancelPress);
-        tile.addEventListener('touchcancel', cancelPress);
-
-        tile.addEventListener('click', () => {
-          if (isSelectionModeActive) {
-            toggleSelection(book.id, tile);
-          } else {
-            openBook(book.id);
+          for (const tagId of activeTagFilters) {
+            const tagIndex = bookTagsStore.index('by_tagId');
+            const booksForTag =
+                  await new Promise(resolve => tagIndex
+                                    .getAll(tagId).onsuccess =
+                                    e => resolve(e.target.result));
+            booksForTag.forEach(bookTag => {
+              booksMatchingTags.add(bookTag.bookId);
+            });
           }
-        });
-
-        const selectionIndicator = document.createElement('div');
-        selectionIndicator.className = 'selection-indicator';
-        tile.appendChild(selectionIndicator);
-
-        const cover = document.createElement('div');
-        cover.className = 'book-cover';
-        tile.appendChild(cover);
-
-        const title = document.createElement('div');
-        title.className = 'book-title';
-        title.textContent = book.name;
-        tile.appendChild(title);
-
-        const progressBar = document.createElement('div');
-        progressBar.className = 'progress-bar';
-        const progress = document.createElement('div');
-        progress.className = 'progress';
-        progressBar.appendChild(progress);
-        tile.appendChild(progressBar);
-
-        const bookMeta = metadataMap.get(book.id);
-        if (bookMeta && bookMeta.progress) {
-          progress.style.width = `${bookMeta.progress * 100}%`;
         }
 
-        if (bookMeta && bookMeta.state) {
-          const stateOverlay = document.createElement('div');
-          stateOverlay.className = 'state-overlay';
-          stateOverlay.textContent =
-            bookMeta.state.charAt(0).toUpperCase() + bookMeta.state.slice(1);
-          cover.appendChild(stateOverlay);
-        }
-
-        const menu = document.createElement('div');
-        menu.className = 'hamburger-menu';
-        menu.innerHTML = (`<div class="menu-dot"></div>` +
-                          `<div class="menu-dot"></div>` +
-                          `<div class="menu-dot"></div>`);
-        tile.appendChild(menu);
-
-        const menuContent = document.createElement('div');
-        menuContent.className = 'menu-content';
-        const deleteLink = document.createElement('a');
-        deleteLink.href = '#';
-        deleteLink.textContent = 'Delete';
-        menuContent.appendChild(deleteLink);
-
-        const downloadLink = document.createElement('a');
-        downloadLink.href = '#';
-        downloadLink.textContent = 'Download';
-        menuContent.appendChild(downloadLink);
-
-        if (book.type === 'cbz') {
-          const exportLink = document.createElement('a');
-          exportLink.href = '#';
-          exportLink.textContent = 'Export as EPub';
-          exportLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            exportAsEpub(book.id);
-            menuContent.classList.remove('show-menu');
-          });
-          menuContent.appendChild(exportLink);
-        }
-
-        const tagLink = document.createElement('a');
-        tagLink.href = '#';
-        tagLink.textContent = 'Edit Tags';
-        tagLink.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          openTagEditor(book.id, book.name);
-          menuContent.classList.remove('show-menu');
-        });
-        menuContent.appendChild(tagLink);
-
-        const resetMenu = document.createElement('div');
-        resetMenu.innerHTML = '<hr><span>Reset State:</span>';
-        menuContent.appendChild(resetMenu);
-
-        const states = ['unread', 'reading', 'finished'];
-        states.forEach(state => {
-          const link = document.createElement('a');
-          link.href = '#';
-          link.textContent = state.charAt(0).toUpperCase() + state.slice(1);
-          link.addEventListener('click', async (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            await updateBookState(book.id, state);
-            menuContent.classList.remove('show-menu');
-          });
-          resetMenu.appendChild(link);
-        });
-
-        menu.appendChild(menuContent);
-
-        menu.addEventListener('click', (event) => {
-          event.stopPropagation();
-          menuContent.classList.toggle('show-menu');
-        });
-
-        deleteLink.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          if (confirm(`Are you sure you want to delete "${book.name}"?`)) {
-            deleteBook(book.id);
+        const filteredBooks = books.filter(book => {
+          const meta = metadataMap.get(book.id);
+          // State filter check
+          if (!meta || !activeStateFilters.includes(meta.state)) {
+            return false;
           }
+          // Tag filter check
+          if (booksMatchingTags && !booksMatchingTags.has(book.id)) {
+            return false;
+          }
+          return true;
         });
 
-        downloadLink.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          downloadBook(book.id);
-          menuContent.classList.remove('show-menu');
-        });
+        const sortBy = document.getElementById('sort-by').value;
+        if (sortBy === 'title') {
+          filteredBooks
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        } else if (sortBy === 'last-read') {
+          filteredBooks.sort((a, b) => {
+            const metaA = metadataMap.get(a.id);
+            const metaB = metadataMap.get(b.id);
+            const timeA = metaA ? metaA.lastReadTimestamp || 0 : 0;
+            const timeB = metaB ? metaB.lastReadTimestamp || 0 : 0;
+            return timeB - timeA;
+          });
+        }
 
-        bookGrid.appendChild(tile);
+        const booksToDisplay =
+              filteredBooks.slice(currentBookOffset, currentBookOffset + BOOKS_PER_PAGE);
 
-        // Handle cover image display
-        if (book.coverImage instanceof Blob) {
-          const imageUrl = URL.createObjectURL(book.coverImage);
-          const img = document.createElement('img');
-          img.dataset.src = imageUrl;
-          img.classList.add('lazy');
-          cover.appendChild(img);
-          coverObserver.observe(img);
+        if (booksToDisplay.length < BOOKS_PER_PAGE) {
+          trigger.style.display = 'none';
         } else {
-          const bookInstance = ePub(book.data);
-          bookInstance.coverUrl().then(async (url) => {
-            if (url) {
-              const response = await fetch(url);
-              const originalBlob = await response.blob();
-              const blob = await resizeImageBlob(originalBlob);
+          trigger.style.display = 'block';
+        }
 
-              // Save the blob back to the database
-              const readwriteTx = db.transaction([STORE_BOOKS_NAME], 'readwrite');
-              const store = readwriteTx.objectStore(STORE_BOOKS_NAME);
-              const getReq = store.get(book.id);
-              getReq.onsuccess = () => {
-                const bookToUpdate = getReq.result;
-                bookToUpdate.coverImage = blob;
-                store.put(bookToUpdate);
-              };
+        if (booksToDisplay.length === 0 && currentBookOffset === 0) {
+          bookGrid.insertBefore(document.createRange()
+                               .createContextualFragment('<p id="no-books-msg">No books match the current filters.</p>'),
+                               trigger);
+          isLoadingBooks = false;
+          resolve();
+          return;
+        } else {
+          const noBooksMsg = document.getElementById('no-books-msg');
+          if (noBooksMsg) noBooksMsg.remove();
+        }
 
-              const imageUrl = URL.createObjectURL(blob);
-              const img = document.createElement('img');
-              img.dataset.src = imageUrl;
-              img.classList.add('lazy');
-              cover.appendChild(img);
-              coverObserver.observe(img);
+        booksToDisplay.forEach((book) => {
+          const tile = document.createElement('div');
+          tile.className = 'book-tile';
+          tile.dataset.bookId = book.id;
+
+          // --- Selection Logic ---
+          let pressTimer;
+
+          const startPress = (e) => {
+            if (isSelectionModeActive) return;
+            pressTimer = setTimeout(() => {
+              e.preventDefault();
+              enterSelectionMode();
+            }, 500); // 500ms for long press
+          };
+
+          const cancelPress = () => {
+            clearTimeout(pressTimer);
+          };
+
+          tile.addEventListener('mousedown', startPress);
+          tile.addEventListener('mouseup', cancelPress);
+          tile.addEventListener('mouseleave', cancelPress);
+          tile.addEventListener('touchstart', startPress);
+          tile.addEventListener('touchend', cancelPress);
+          tile.addEventListener('touchcancel', cancelPress);
+
+          tile.addEventListener('click', () => {
+            if (isSelectionModeActive) {
+              toggleSelection(book.id, tile);
             } else {
-              cover.textContent = 'No cover';
+              openBook(book.id);
             }
           });
-        }
-      });
-      currentBookOffset += booksToDisplay.length;
-      isLoadingBooks = false;
-    };
-  };
 
-  request.onerror = (event) => {
-    console.error('Error fetching books:', event.target.errorCode);
-  };
+          const selectionIndicator = document.createElement('div');
+          selectionIndicator.className = 'selection-indicator';
+          tile.appendChild(selectionIndicator);
+
+          const cover = document.createElement('div');
+          cover.className = 'book-cover';
+          tile.appendChild(cover);
+
+          const title = document.createElement('div');
+          title.className = 'book-title';
+          title.textContent = book.name;
+          tile.appendChild(title);
+
+          const progressBar = document.createElement('div');
+          progressBar.className = 'progress-bar';
+          const progress = document.createElement('div');
+          progress.className = 'progress';
+          progressBar.appendChild(progress);
+          tile.appendChild(progressBar);
+
+          const bookMeta = metadataMap.get(book.id);
+          if (bookMeta && bookMeta.progress) {
+            progress.style.width = `${bookMeta.progress * 100}%`;
+          }
+
+          if (bookMeta && bookMeta.state) {
+            const stateOverlay = document.createElement('div');
+            stateOverlay.className = 'state-overlay';
+            stateOverlay.textContent =
+              bookMeta.state.charAt(0).toUpperCase() + bookMeta.state.slice(1);
+            cover.appendChild(stateOverlay);
+          }
+
+          const menu = document.createElement('div');
+          menu.className = 'hamburger-menu';
+          menu.innerHTML = (`<div class="menu-dot"></div>` +
+                            `<div class="menu-dot"></div>` +
+                            `<div class="menu-dot"></div>`);
+          tile.appendChild(menu);
+
+          const menuContent = document.createElement('div');
+          menuContent.className = 'menu-content';
+          const deleteLink = document.createElement('a');
+          deleteLink.href = '#';
+          deleteLink.textContent = 'Delete';
+          menuContent.appendChild(deleteLink);
+
+          const downloadLink = document.createElement('a');
+          downloadLink.href = '#';
+          downloadLink.textContent = 'Download';
+          menuContent.appendChild(downloadLink);
+
+          if (book.type === 'cbz') {
+            const exportLink = document.createElement('a');
+            exportLink.href = '#';
+            exportLink.textContent = 'Export as EPub';
+            exportLink.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              exportAsEpub(book.id);
+              menuContent.classList.remove('show-menu');
+            });
+            menuContent.appendChild(exportLink);
+          }
+
+          const tagLink = document.createElement('a');
+          tagLink.href = '#';
+          tagLink.textContent = 'Edit Tags';
+          tagLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openTagEditor(book.id, book.name);
+            menuContent.classList.remove('show-menu');
+          });
+          menuContent.appendChild(tagLink);
+
+          const resetMenu = document.createElement('div');
+          resetMenu.innerHTML = '<hr><span>Reset State:</span>';
+          menuContent.appendChild(resetMenu);
+
+          const states = ['unread', 'reading', 'finished'];
+          states.forEach(state => {
+            const link = document.createElement('a');
+            link.href = '#';
+            link.textContent = state.charAt(0).toUpperCase() + state.slice(1);
+            link.addEventListener('click', async (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              await updateBookState(book.id, state);
+              menuContent.classList.remove('show-menu');
+            });
+            resetMenu.appendChild(link);
+          });
+
+          menu.appendChild(menuContent);
+
+          menu.addEventListener('click', (event) => {
+            event.stopPropagation();
+            menuContent.classList.toggle('show-menu');
+          });
+
+          deleteLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (confirm(`Are you sure you want to delete "${book.name}"?`)) {
+              deleteBook(book.id);
+            }
+          });
+
+          downloadLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            downloadBook(book.id);
+            menuContent.classList.remove('show-menu');
+          });
+
+          bookGrid.insertBefore(tile, trigger);
+
+          // Handle cover image display
+          if (book.coverImage instanceof Blob) {
+            const imageUrl = URL.createObjectURL(book.coverImage);
+            const img = document.createElement('img');
+            img.dataset.src = imageUrl;
+            img.classList.add('lazy');
+            cover.appendChild(img);
+            coverObserver.observe(img);
+          } else {
+            const bookInstance = ePub(book.data);
+            bookInstance.coverUrl().then(async (url) => {
+              if (url) {
+                const response = await fetch(url);
+                const originalBlob = await response.blob();
+                const blob = await resizeImageBlob(originalBlob);
+
+                // Save the blob back to the database
+                const readwriteTx = db.transaction([STORE_BOOKS_NAME], 'readwrite');
+                const store = readwriteTx.objectStore(STORE_BOOKS_NAME);
+                const getReq = store.get(book.id);
+                getReq.onsuccess = () => {
+                  const bookToUpdate = getReq.result;
+                  bookToUpdate.coverImage = blob;
+                  store.put(bookToUpdate);
+                };
+
+                const imageUrl = URL.createObjectURL(blob);
+                const img = document.createElement('img');
+                img.dataset.src = imageUrl;
+                img.classList.add('lazy');
+                cover.appendChild(img);
+                coverObserver.observe(img);
+              } else {
+                cover.textContent = 'No cover';
+              }
+            });
+          }
+        });
+        currentBookOffset += booksToDisplay.length;
+        isLoadingBooks = false;
+        resolve();
+      };
+    };
+
+    request.onerror = (event) => {
+      console.error('Error fetching books:', event.target.errorCode);
+      isLoadingBooks = false;
+      reject(event.target.errorCode);
+    };
+  });
 }
 
 function toggleSelection(bookId, tileElement) {

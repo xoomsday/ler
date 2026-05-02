@@ -186,6 +186,11 @@ h1 {
   flex-grow: 1;
 }
 
+#infinite-scroll-trigger {
+  grid-column: 1 / -1;
+  height: 50px;
+}
+
 .book-tile {
   position: relative; /* For hamburger menu */
   border: 1px solid #ccc;
