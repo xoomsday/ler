@@ -1592,19 +1592,15 @@ async function nextCbzPage() {
 }
 
 async function prevCbzPage() {
-  let targetPage = currentComicPage - pagesCurrentlyDisplayed;
-  if (currentComicPage > 0 && targetPage < 0) targetPage = 0;
+  let targetPage = currentComicPage - 2;
+  if (targetPage < 0) targetPage = 0;
 
   if (pagesCurrentlyDisplayed === 1 && currentComicPage > 0) {
-    targetPage = currentComicPage - 2;
-    if (targetPage < 0) targetPage = 0;
     if (soloPageExceptions.includes(targetPage + 1)) {
       targetPage = currentComicPage - 1;
     }
-  } else {
-    targetPage = currentComicPage - 2;
-    if (targetPage < 0) targetPage = 0;
   }
+
   if (currentComicPage === 1) targetPage = 0;
 
   await displayComicPage(targetPage);
@@ -1629,25 +1625,31 @@ async function prevPage() {
 async function handleEpubKeyPress(event) {
   switch (event.key) {
   case 'ArrowLeft':
+    event.preventDefault();
     if (currentBookDirection === 'rtl') nextEpubPage(); else prevEpubPage();
     break;
   case 'ArrowRight':
+    event.preventDefault();
     if (currentBookDirection === 'rtl') prevEpubPage(); else nextEpubPage();
     break;
   case 'ArrowUp':
   case '+':
   case '=':
+    event.preventDefault();
     increaseFontSize();
     break;
   case 'ArrowDown':
   case '-':
   case '_':
+    event.preventDefault();
     decreaseFontSize();
     break;
   case '[':
+    event.preventDefault();
     decreaseLineHeight();
     break;
   case ']':
+    event.preventDefault();
     increaseLineHeight();
     break;
   case '0':
@@ -1685,33 +1687,35 @@ async function handleEpubKeyPress(event) {
 
 async function handleCbzKeyPress(event) {
   switch (event.key) {
-  case 'ArrowLeft':
-    if (currentBookDirection === 'rtl') nextCbzPage(); else prevCbzPage();
-    break;
-  case 'ArrowRight':
-    if (currentBookDirection === 'rtl') prevCbzPage(); else nextCbzPage();
-    break;
-  case 'd':
-    toggleDirection();
-    break;
-  case 's':
-    toggleSpread();
-    break;
-  case '.':
-    toggleControls();
-    break;
-  case 'Q':
-    closeReader();
-    break;
-  case '?':
-    const helpOverlay = document.getElementById('help-overlay');
-    if (helpOverlay.style.display === 'none') {
-      generateHelpContent(currentBookType);
-      helpOverlay.style.display = 'block';
-    } else {
-      helpOverlay.style.display = 'none';
-    }
-    break;
+    case 'ArrowLeft':
+      event.preventDefault();
+      if (currentBookDirection === 'rtl') nextCbzPage(); else prevCbzPage();
+      break;
+    case 'ArrowRight':
+      event.preventDefault();
+      if (currentBookDirection === 'rtl') prevCbzPage(); else nextCbzPage();
+      break;
+    case 'd':
+      toggleDirection();
+      break;
+    case 's':
+      toggleSpread();
+      break;
+    case '.':
+      toggleControls();
+      break;
+    case 'Q':
+      closeReader();
+      break;
+    case '?':
+      const helpOverlay = document.getElementById('help-overlay');
+      if (helpOverlay.style.display === 'none') {
+        generateHelpContent(currentBookType);
+        helpOverlay.style.display = 'block';
+      } else {
+        helpOverlay.style.display = 'none';
+      }
+      break;
   }
 }
 
@@ -3130,137 +3134,156 @@ async function displayComicPage(pageNumber) {
   if (pageNumber < 0 || pageNumber >= comicBookPages.length) {
     return;
   }
-  const slider = document.getElementById('progress-slider');
-  const currentLabel = document.getElementById('progress-current-label');
-  slider.value = pageNumber;
-  currentLabel.textContent = pageNumber + 1;
 
-  currentComicPage = pageNumber;
-  const viewer = document.getElementById('viewer');
-  viewer.innerHTML = ''; // Clear previous content
-  viewer.style.display = 'flex'; // Use flexbox for layout
+  const taskId = ++currentCbzTaskId;
+  isNavigating = true;
 
-  const readerView = document.getElementById('reader-view');
-  const spreadToggleButton = document.getElementById('spread-toggle');
+  try {
+    const slider = document.getElementById('progress-slider');
+    const currentLabel = document.getElementById('progress-current-label');
+    slider.value = pageNumber;
+    currentLabel.textContent = pageNumber + 1;
 
-  // --- Layout Decision Logic ---
-  const page1File = comicBookPages[pageNumber];
-  const page2File = ((pageNumber + 1 < comicBookPages.length)
-                     ? comicBookPages[pageNumber + 1]
-                     : null);
+    currentComicPage = pageNumber;
+    const viewer = document.getElementById('viewer');
 
-  const [page1Dims, page2Dims] = await Promise.all([
-    getImageDimensions(page1File),
-    getImageDimensions(page2File)
-  ]);
+    const readerView = document.getElementById('reader-view');
+    const spreadToggleButton = document.getElementById('spread-toggle');
 
-  const viewerDims = { width: viewer.clientWidth, height: viewer.clientHeight };
+    // --- Layout Decision Logic ---
+    const page1File = comicBookPages[pageNumber];
+    const page2File = ((pageNumber + 1 < comicBookPages.length)
+                       ? comicBookPages[pageNumber + 1]
+                       : null);
 
-  let layout = 'single'; // Default layout
+    const [page1Dims, page2Dims] = await Promise.all([
+      getImageDimensions(page1File),
+      getImageDimensions(page2File)
+    ]);
 
-  // 1. Level 1: Manual User Override (Highest Priority)
-  if (soloPageExceptions.includes(pageNumber)) {
-    layout = 'single';
-  } else if (pageNumber === 0 || !page2File) {
-    // Edge cases: Cover page or no next page always single
-    layout = 'single';
-  } else if (comicInfoPageLayouts.get(pageNumber) === 'double') {
-    // 2. Level 2: Explicit Metadata from ComicInfo.xml (Second Priority)
-    layout = 'double';
-  } else if (viewerDims.width > viewerDims.height) {
-    // Only consider two-page layout in landscape
-    // 3. Level 3: Automatic "Wasted Pixel" Calculation (Lowest Priority)
-    // Calculate wasted pixels for single page
-    const scaleSingle = Math.min(viewerDims.width / page1Dims.width,
-                                 viewerDims.height / page1Dims.height);
-    const areaSingle = (page1Dims.width * scaleSingle) * (page1Dims.height * scaleSingle);
-    const wastedSingle = (viewerDims.width * viewerDims.height) - areaSingle;
+    if (taskId !== currentCbzTaskId) return;
 
-    // Calculate wasted pixels for double page
-    const combinedWidth = page1Dims.width + page2Dims.width;
-    const combinedHeight = Math.max(page1Dims.height, page2Dims.height);
-    const scaleDouble = Math.min(viewerDims.width / combinedWidth,
-                                 viewerDims.height / combinedHeight);
-    const areaDouble = (combinedWidth * scaleDouble) * (combinedHeight * scaleDouble);
-    const wastedDouble = (viewerDims.width * viewerDims.height) - areaDouble;
+    const viewerDims = { width: viewer.clientWidth, height: viewer.clientHeight };
 
-    if (wastedDouble < wastedSingle) {
+    let layout = 'single'; // Default layout
+
+    // 1. Level 1: Manual User Override (Highest Priority)
+    if (soloPageExceptions.includes(pageNumber)) {
+      layout = 'single';
+    } else if (pageNumber === 0 || !page2File) {
+      // Edge cases: Cover page or no next page always single
+      layout = 'single';
+    } else if (comicInfoPageLayouts.get(pageNumber) === 'double') {
+      // 2. Level 2: Explicit Metadata from ComicInfo.xml (Second Priority)
       layout = 'double';
+    } else if (viewerDims.width > viewerDims.height) {
+      // Only consider two-page layout in landscape
+      // 3. Level 3: Automatic "Wasted Pixel" Calculation (Lowest Priority)
+      // Calculate wasted pixels for single page
+      const scaleSingle = Math.min(viewerDims.width / page1Dims.width,
+                                   viewerDims.height / page1Dims.height);
+      const areaSingle = (page1Dims.width * scaleSingle) * (page1Dims.height * scaleSingle);
+      const wastedSingle = (viewerDims.width * viewerDims.height) - areaSingle;
+
+      // Calculate wasted pixels for double page
+      const combinedWidth = page1Dims.width + page2Dims.width;
+      const combinedHeight = Math.max(page1Dims.height, page2Dims.height);
+      const scaleDouble = Math.min(viewerDims.width / combinedWidth,
+                                   viewerDims.height / combinedHeight);
+      const areaDouble = (combinedWidth * scaleDouble) * (combinedHeight * scaleDouble);
+      const wastedDouble = (viewerDims.width * viewerDims.height) - areaDouble;
+
+      if (wastedDouble < wastedSingle) {
+        layout = 'double';
+      }
     }
-  }
 
-  // --- Rendering Logic ---
-  pagesCurrentlyDisplayed = 0;
-  readerView.classList.remove('show-spread-toggle');
-  spreadToggleButton.textContent = 'Split';
+    // --- Rendering Logic ---
+    pagesCurrentlyDisplayed = 0;
+    readerView.classList.remove('show-spread-toggle');
+    spreadToggleButton.textContent = 'Split';
 
-  const isSoloException = soloPageExceptions.includes(pageNumber);
-  if (isSoloException) {
-    readerView.classList.add('show-spread-toggle');
-    spreadToggleButton.textContent = 'Rejoin';
-  }
-  updateTrcGroupVisibility();
+    const isSoloException = soloPageExceptions.includes(pageNumber);
+    if (isSoloException) {
+      readerView.classList.add('show-spread-toggle');
+      spreadToggleButton.textContent = 'Rejoin';
+    }
+    updateTrcGroupVisibility();
 
 
-  const filesToRender = [];
-  if (layout === 'double') {
-    filesToRender.push(page1File, page2File);
-    pagesCurrentlyDisplayed = 2;
-    readerView.classList.add('show-spread-toggle');
-  } else {
-    filesToRender.push(page1File);
-    pagesCurrentlyDisplayed = 1;
-  }
-
-  const imagePromises = filesToRender.map(file => file.async('blob')
-                                          .then(blob => URL.createObjectURL(blob)));
-  const imageUrls = await Promise.all(imagePromises);
-
-  const fragment = document.createDocumentFragment();
-  const imageElements = [];
-  imageUrls.forEach(url => {
-    const img = document.createElement('img');
-    img.src = url;
-    img.style.objectFit = 'contain';
-    img.style.maxHeight = '100%'; // Keep this to handle edge cases
-    img.onload = () => URL.revokeObjectURL(url); // Revoke on load
-    fragment.appendChild(img);
-    imageElements.push(img);
-  });
-
-  // --- New Scaling Logic ---
-  // Get dimensions of all images that will be rendered
-  const allDims = await Promise.all(imageElements.map(img => new Promise(resolve => {
-    if (img.complete) {
-      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    const filesToRender = [];
+    if (layout === 'double') {
+      filesToRender.push(page1File, page2File);
+      pagesCurrentlyDisplayed = 2;
+      readerView.classList.add('show-spread-toggle');
     } else {
-      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      filesToRender.push(page1File);
+      pagesCurrentlyDisplayed = 1;
     }
-  })));
 
-  // Calculate the total dimensions of the spread
-  const totalWidth = allDims.reduce((sum, dim) => sum + dim.width, 0);
-  const maxHeight = Math.max(...allDims.map(dim => dim.height));
+    const imagePromises = filesToRender.map(file => file.async('blob')
+                                            .then(blob => URL.createObjectURL(blob)));
+    const imageUrls = await Promise.all(imagePromises);
 
-  // Calculate the scale factor to fit the spread in the viewer
-  const viewerWidth = viewer.clientWidth;
-  const viewerHeight = viewer.clientHeight;
-  const scale = Math.min(viewerWidth / totalWidth, viewerHeight / maxHeight);
+    if (taskId !== currentCbzTaskId) {
+      imageUrls.forEach(url => URL.revokeObjectURL(url));
+      return;
+    }
 
-  // Apply the calculated dimensions to each image
-  allDims.forEach((dim, index) => {
-    imageElements[index].style.width = `${dim.width * scale}px`;
-    imageElements[index].style.height = `${dim.height * scale}px`;
-  });
+    viewer.innerHTML = ''; // Clear previous content
+    viewer.style.display = 'flex'; // Use flexbox for layout
+    const fragment = document.createDocumentFragment();
+    const imageElements = [];
+    imageUrls.forEach(url => {
+      const img = document.createElement('img');
+      img.src = url;
+      img.style.objectFit = 'contain';
+      img.style.maxHeight = '100%'; // Keep this to handle edge cases
+      img.onload = () => URL.revokeObjectURL(url); // Revoke on load
+      fragment.appendChild(img);
+      imageElements.push(img);
+    });
+
+    // --- New Scaling Logic ---
+    // Get dimensions of all images that will be rendered
+    const allDims = await Promise.all(imageElements.map(img => new Promise(resolve => {
+      if (img.complete) {
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      } else {
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      }
+    })));
+
+    if (taskId !== currentCbzTaskId) return;
+
+    // Calculate the total dimensions of the spread
+    const totalWidth = allDims.reduce((sum, dim) => sum + dim.width, 0);
+    const maxHeight = Math.max(...allDims.map(dim => dim.height));
+
+    // Calculate the scale factor to fit the spread in the viewer
+    const viewerWidth = viewer.clientWidth;
+    const viewerHeight = viewer.clientHeight;
+    const scale = Math.min(viewerWidth / totalWidth, viewerHeight / maxHeight);
+
+    // Apply the calculated dimensions to each image
+    allDims.forEach((dim, index) => {
+      imageElements[index].style.width = `${dim.width * scale}px`;
+      imageElements[index].style.height = `${dim.height * scale}px`;
+    });
 
 
-  if (currentBookDirection === 'rtl') {
-    Array.from(fragment.children).reverse().forEach(child => viewer.appendChild(child));
-  } else {
-    viewer.appendChild(fragment);
+    if (currentBookDirection === 'rtl') {
+      Array.from(fragment.children).reverse().forEach(child => viewer.appendChild(child));
+    } else {
+      viewer.appendChild(fragment);
+    }
+
+    await saveLastLocation();
+  } finally {
+    if (taskId === currentCbzTaskId) {
+      isNavigating = false;
+    }
   }
-
-  await saveLastLocation();
 }
 
 function getImageDimensions(pageFile) {
