@@ -10,6 +10,7 @@ const STORE_BOOK_TAGS_NAME = 'book_tags';
 
 let db;
 let currentBook;
+let currentCbzTaskId = 256;
 let currentRendition;
 let currentBookId = null;
 let currentBookType = null;
