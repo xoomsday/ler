@@ -1623,17 +1623,32 @@ async function prevPage() {
   }
 }
 
+function should_move_to_next(key)
+{
+  switch (key) {
+  case 'ArrowLeft':
+    return (currentBookDirection === 'rtl');
+  case 'ArrowRight':
+    return !(currentBookDirection === 'rtl');
+  case ' ':
+    return true;
+  case 'Backspace':
+    return false;
+  }
+}
+
 async function handleEpubKeyPress(event) {
   switch (event.key) {
   case 'ArrowLeft':
-  case ' ':
-    event.preventDefault();
-    if (currentBookDirection === 'rtl') nextEpubPage(); else prevEpubPage();
-    break;
   case 'ArrowRight':
+  case ' ':
   case 'Backspace':
     event.preventDefault();
-    if (currentBookDirection === 'rtl') prevEpubPage(); else nextEpubPage();
+    if (should_move_to_next(event.key)) {
+      nextEpubPage();
+    } else {
+      prevEpubPage();
+    }
     break;
   case 'ArrowUp':
   case '+':
@@ -1691,14 +1706,15 @@ async function handleEpubKeyPress(event) {
 async function handleCbzKeyPress(event) {
   switch (event.key) {
     case 'ArrowLeft':
-    case ' ':
-      event.preventDefault();
-      if (currentBookDirection === 'rtl') nextCbzPage(); else prevCbzPage();
-      break;
     case 'ArrowRight':
+    case ' ':
     case 'Backspace':
       event.preventDefault();
-      if (currentBookDirection === 'rtl') prevCbzPage(); else nextCbzPage();
+      if (should_move_to_next(event.key)) {
+	nextCbzPage();
+      } else {
+	prevCbzPage();
+      }
       break;
     case 'd':
       toggleDirection();
