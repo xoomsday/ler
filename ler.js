@@ -1626,10 +1626,12 @@ async function prevPage() {
 async function handleEpubKeyPress(event) {
   switch (event.key) {
   case 'ArrowLeft':
+  case ' ':
     event.preventDefault();
     if (currentBookDirection === 'rtl') nextEpubPage(); else prevEpubPage();
     break;
   case 'ArrowRight':
+  case 'Backspace':
     event.preventDefault();
     if (currentBookDirection === 'rtl') prevEpubPage(); else nextEpubPage();
     break;
@@ -1689,10 +1691,12 @@ async function handleEpubKeyPress(event) {
 async function handleCbzKeyPress(event) {
   switch (event.key) {
     case 'ArrowLeft':
+    case ' ':
       event.preventDefault();
       if (currentBookDirection === 'rtl') nextCbzPage(); else prevCbzPage();
       break;
     case 'ArrowRight':
+    case 'Backspace':
       event.preventDefault();
       if (currentBookDirection === 'rtl') prevCbzPage(); else nextCbzPage();
       break;
