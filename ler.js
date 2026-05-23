@@ -985,6 +985,7 @@ async function closeReader() {
   currentBookType = null;
   currentBookDirection = 'ltr';
   currentBookLocationsPromise = null;
+  document.title = 'Local Ebook Reader';
 
   isClosing = false; // Release the lock
 }
@@ -1688,6 +1689,7 @@ async function handleEpubKeyPress(event) {
   case '.':
     toggleControls();
     break;
+  case 'q':
   case 'Q':
     closeReader();
     break;
@@ -1705,38 +1707,39 @@ async function handleEpubKeyPress(event) {
 
 async function handleCbzKeyPress(event) {
   switch (event.key) {
-    case 'ArrowLeft':
-    case 'ArrowRight':
-    case ' ':
-    case 'Backspace':
-      event.preventDefault();
-      if (should_move_to_next(event.key)) {
-	nextCbzPage();
-      } else {
-	prevCbzPage();
-      }
-      break;
-    case 'd':
-      toggleDirection();
-      break;
-    case 's':
-      toggleSpread();
-      break;
-    case '.':
-      toggleControls();
-      break;
-    case 'Q':
-      closeReader();
-      break;
-    case '?':
-      const helpOverlay = document.getElementById('help-overlay');
-      if (helpOverlay.style.display === 'none') {
-        generateHelpContent(currentBookType);
-        helpOverlay.style.display = 'block';
-      } else {
-        helpOverlay.style.display = 'none';
-      }
-      break;
+  case 'ArrowLeft':
+  case 'ArrowRight':
+  case ' ':
+  case 'Backspace':
+    event.preventDefault();
+    if (should_move_to_next(event.key)) {
+      nextCbzPage();
+    } else {
+      prevCbzPage();
+    }
+    break;
+  case 'd':
+    toggleDirection();
+    break;
+  case 's':
+    toggleSpread();
+    break;
+  case '.':
+    toggleControls();
+    break;
+  case 'q':
+  case 'Q':
+    closeReader();
+    break;
+  case '?':
+    const helpOverlay = document.getElementById('help-overlay');
+    if (helpOverlay.style.display === 'none') {
+      generateHelpContent(currentBookType);
+      helpOverlay.style.display = 'block';
+    } else {
+      helpOverlay.style.display = 'none';
+    }
+    break;
   }
 }
 
@@ -3151,9 +3154,41 @@ async function openComicBook(bookRecord, metadata) {
   displayComicPage(currentComicPage);
 }
 
+
+async function getBookMetadata(bookId) {
+  return new Promise((resolve, reject) => {
+    if (!db) {
+      reject("DB not initialized");
+      return;
+    }
+    const transaction = db.transaction([STORE_METADATA_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_METADATA_NAME);
+    const request = store.get(bookId);
+
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+
+    request.onerror = (event) => {
+      reject(event.target.error);
+    };
+  });
+}
+
 async function displayComicPage(pageNumber) {
   if (pageNumber < 0 || pageNumber >= comicBookPages.length) {
     return;
+  }
+
+  if (currentBookId) {
+    try {
+      const metadata = await getBookMetadata(currentBookId);
+      if (metadata && metadata.name) {
+        document.title = metadata.name;
+      }
+    } catch (e) {
+      console.error("Error fetching metadata to set title:", e);
+    }
   }
 
   const taskId = ++currentCbzTaskId;
