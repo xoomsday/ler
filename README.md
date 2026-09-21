@@ -97,8 +97,13 @@ the browser's IndexedDB.
         *   **Robust Section Transitions**: Specialized handling for
           chapter boundaries to overcome library limitations.
     *   **Per-Book Display Settings**:
-        *   **For EPUBs**: Font size, line height, and font face
-          (serif/sans-serif) are saved for each book individually.
+        *   **For EPUBs**: Font size, line height, font face
+          (serif/sans-serif), and reading direction (Default /
+          Vertical-RtL) are saved for each book individually. In
+          Default mode, the reader respects the book's natural
+          writing direction and styling; in Vertical-RtL mode, it
+          forces vertical top-to-bottom right-to-left layout and RTL
+          page progression regardless of the document's original CSS.
         *   **For Comics**: The user's preferred reading direction and
           any manual spread overrides ("splits") are saved for each
           comic individually.
@@ -120,9 +125,9 @@ the browser's IndexedDB.
           on the main content area.
         *   **Book Title Display**: The title of the current book is
           shown in the center of the top control bar.
-        *   **Intuitive Display Controls**: Font size, line height, and
-          font face are managed with "pill" shaped controls that always
-          show the current value.
+        *   **Intuitive Display Controls**: Font size, line height, font
+          face, and reading direction are managed with "pill" shaped
+          controls that always show the current value.
         *   **Progress Indicator**: A progress indicator is now
           displayed, showing the current page number and total pages
           for CBZ files, and the percentage completed for EPUB files.
@@ -149,6 +154,7 @@ the browser's IndexedDB.
             *   `ArrowDown` / `-` / `_`: Decrease the font size.
             *   `[` / `]`: Increase or decrease the line spacing.
             *   `f`: Toggle **f**ont (serif/sans-serif).
+            *   `v`: Toggle **v**ertical-RtL / Default reading mode.
             *   `d`: Toggle **d**ark mode.
             *   `m`: Toggle TOC/**m**enu overlay.
             *   `b`: Add **b**ookmark at current location.
@@ -188,9 +194,9 @@ the browser's IndexedDB.
       edges.
 7.  **Show Controls**: Move your mouse, or tap/click the book's text.
 8.  **Adjust Display (EPUB)**: Use the on-screen pill controls to
-    adjust font size, line height, and font face, or use the
-    corresponding keyboard shortcuts (`+`/`-`/`[`/`]`/`f`). Press `0`
-    to reset.
+    adjust font size, line height, and font face, or toggle Vertical-RtL
+    mode. You can also use the corresponding keyboard shortcuts
+    (`+`/`-`/`[`/`]` / `f` / `v`). Press `0` to reset.
 9.  **Adjust TTS**: Use the controls in the TTS pill to adjust speech
     rate and pitch.
 10. **Adjust Display (Comic)**: Use the on-screen pill controls to
@@ -206,10 +212,10 @@ the browser's IndexedDB.
 This section details features that are part of the project's vision but
 are not yet implemented.
 
-*   **Full Page Progression and Writing Mode Support**: While basic RTL
-    support is present, comprehensive testing and support for all
-    `page-progression-direction` and `writing-mode` (e.g.,
-    vertical-rl) CSS attributes are not yet implemented.
+*   **Page Progression and Writing Mode Support**: Vertical-RtL mode
+    forces vertical text with right-to-left line and page progression
+    for EPUBs. Further auto-detection from document metadata remains a
+    continuous improvement area.
 
 ### Potential Reader Improvements (Technical Debt)
 
