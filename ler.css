@@ -637,7 +637,7 @@ h1 {
 }
 
 #direction-toggle-pill {
-  display: none;
+  display: flex;
 }
 
 .comic-mode #direction-toggle-pill {

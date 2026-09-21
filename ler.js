@@ -14,7 +14,7 @@ let currentCbzTaskId = 256;
 let currentRendition;
 let currentBookId = null;
 let currentBookType = null;
-let currentBookDirection = 'ltr';
+let currentBookDirection = 'default';
 let currentBookLanguage = 'en-US'; // Default language for TTS
 let currentFontSize = 100;
 let currentLineHeight = 1.5;
@@ -55,6 +55,68 @@ let rubyMRUCache = new Map();
 const MAX_RUBY_CACHE_SIZE = 200;
 let currentChunks = [];
 let currentChunkIndex = 0;
+
+function isEffectiveRtl() {
+  if (currentBookType === 'cbz') {
+    return currentBookDirection === 'rtl';
+  }
+  if (currentBookDirection === 'rtl') {
+    return true;
+  }
+  if (currentBookDirection === 'ltr') {
+    return false;
+  }
+  // For 'default', check EPUB packaging metadata / rendition direction / spine / writing-mode
+  if (currentBook) {
+    if (currentBook.packaging && currentBook.packaging.metadata &&
+        currentBook.packaging.metadata.direction === 'rtl') {
+      return true;
+    }
+    if (currentBook.packaging && currentBook.packaging.spine &&
+        currentBook.packaging.spine.pageProgressionDirection === 'rtl') {
+      return true;
+    }
+    if (currentBook.spine && currentBook.spine.pageProgressionDirection === 'rtl') {
+      return true;
+    }
+  }
+  if (currentRendition) {
+    if (currentRendition.manager && currentRendition.manager.settings &&
+        currentRendition.manager.settings.direction === 'rtl') {
+      return true;
+    }
+    if (currentRendition.settings && currentRendition.settings.direction === 'rtl') {
+      return true;
+    }
+    const view = currentRendition.manager && currentRendition.manager.views && currentRendition.manager.views.first();
+    if (view && view.contents) {
+      const wm = view.contents.writingMode();
+      if (wm && wm.indexOf('vertical') === 0) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function updateReaderDirection() {
+  const readerView = document.getElementById('reader-view');
+  if (readerView) {
+    readerView.dataset.direction = isEffectiveRtl() ? 'rtl' : 'ltr';
+  }
+  updateDirectionButton();
+}
+
+function applyDirectionOverrides() {
+  if (!currentRendition) return;
+  if (currentBookDirection === 'rtl') {
+    currentRendition.themes.override('writing-mode', 'vertical-rl', true);
+    currentRendition.themes.override('-webkit-writing-mode', 'vertical-rl', true);
+  } else {
+    currentRendition.themes.removeOverride('writing-mode');
+    currentRendition.themes.removeOverride('-webkit-writing-mode');
+  }
+}
 
 function patchEpubJsForVerticalWriting() {
   if (typeof ePub === 'undefined') return;
@@ -964,7 +1026,7 @@ window.addEventListener('load', async () => {
   });
 
   addCallback('prev-page-area', 'click', (event) => {
-    if (currentBookDirection === 'rtl') {
+    if (isEffectiveRtl()) {
       nextPage();
     } else {
       prevPage();
@@ -972,7 +1034,7 @@ window.addEventListener('load', async () => {
   });
 
   addCallback('next-page-area', 'click', (event) => {
-    if (currentBookDirection === 'rtl') {
+    if (isEffectiveRtl()) {
       prevPage();
     } else {
       nextPage();
@@ -1298,7 +1360,7 @@ async function closeReader() {
   currentBook = null;
   currentBookId = null;
   currentBookType = null;
-  currentBookDirection = 'ltr';
+  currentBookDirection = 'default';
   currentBookLocationsPromise = null;
   document.title = 'Local Ebook Reader';
 
@@ -1412,6 +1474,7 @@ function saveBookSettings() {
       data.fontSize = currentFontSize;
       data.lineHeight = currentLineHeight;
       data.font = currentFont;
+      data.direction = currentBookDirection;
       store.put(data);
     };
   });
@@ -1503,28 +1566,51 @@ async function applyFont() {
 }
 
 async function toggleDirection() {
-  if (currentBookType !== 'cbz') return;
-
-  if (currentBookDirection === 'ltr') {
-    currentBookDirection = 'rtl';
+  if (currentBookType === 'cbz') {
+    if (currentBookDirection === 'ltr') {
+      currentBookDirection = 'rtl';
+    } else {
+      currentBookDirection = 'ltr';
+    }
   } else {
-    currentBookDirection = 'ltr';
+    // For EPUB: toggle between 'default' and 'rtl' (forced Vertical-RtL)
+    if (currentBookDirection === 'rtl') {
+      currentBookDirection = 'default';
+    } else {
+      currentBookDirection = 'rtl';
+    }
   }
-  updateDirectionButton();
+  updateReaderDirection();
 
   // Save the new direction to metadata
-  const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
-  const store = transaction.objectStore(STORE_METADATA_NAME);
-  const request = store.get(currentBookId);
-  request.onsuccess = () => {
-    const data = request.result || { bookId: currentBookId };
-    data.direction = currentBookDirection;
-    store.put(data);
-  };
-  await new Promise((resolve, reject) => {
-    transaction.oncomplete = resolve;
-    transaction.onerror = reject;
-  });
+  await saveBookSettings();
+
+  if (currentBookType === 'cbz') {
+    await displayComicPage(currentComicPage);
+  } else if (currentBookType === 'epub' && currentRendition) {
+    let cfi = null;
+    try {
+      const loc = currentRendition.currentLocation();
+      if (loc && loc.start) {
+        cfi = loc.start.cfi;
+      }
+    } catch (e) {
+      console.warn("Could not get CFI before toggling direction:", e);
+    }
+
+    applyDirectionOverrides();
+    if (currentRendition.manager) {
+      currentRendition.manager.direction(isEffectiveRtl() ? 'rtl' : 'ltr');
+    }
+    updateReaderDirection();
+
+    if (cfi) {
+      await gotoCFI(cfi);
+    } else {
+      await currentRendition.display();
+    }
+    await saveLastLocation();
+  }
 }
 
 async function toggleSpread() {
@@ -1557,10 +1643,18 @@ async function toggleSpread() {
 
 function updateDirectionButton() {
   const button = document.getElementById('direction-toggle');
-  if (currentBookDirection === 'rtl') {
-    button.textContent = 'RTL';
+  if (currentBookType === 'cbz') {
+    if (currentBookDirection === 'rtl') {
+      button.textContent = 'RTL';
+    } else {
+      button.textContent = 'LTR';
+    }
   } else {
-    button.textContent = 'LTR';
+    if (currentBookDirection === 'rtl') {
+      button.textContent = 'Vertical-RtL';
+    } else {
+      button.textContent = 'Default';
+    }
   }
 }
 
@@ -1612,22 +1706,38 @@ function generateToc() {
   const tocOverlay = document.getElementById('toc-overlay');
   tocOverlay.innerHTML = '<h3>Table of Contents</h3>';
 
-  currentBook.loaded.navigation.then((toc) => {
-    const tocList = document.createElement('ul');
-    toc.forEach((item) => {
+  function createTocList(items) {
+    const ul = document.createElement('ul');
+    items.forEach((item) => {
       const li = document.createElement('li');
       const a = document.createElement('a');
-      a.textContent = item.label;
+      a.textContent = item.label ? item.label.trim() : '';
       a.href = item.href;
-      a.addEventListener('click', (event) => {
+      a.addEventListener('click', async (event) => {
         event.preventDefault();
-        currentRendition.display(item.href);
+        try {
+          await currentRendition.display(item.href);
+          await saveLastLocation();
+        } catch (e) {
+          console.error("Error navigating TOC:", e);
+        }
         toggleOverlay('toc'); // Close after selection
       });
       li.appendChild(a);
-      tocList.appendChild(li);
+      if (item.subitems && item.subitems.length > 0) {
+        li.appendChild(createTocList(item.subitems));
+      }
+      ul.appendChild(li);
     });
-    tocOverlay.appendChild(tocList);
+    return ul;
+  }
+
+  currentBook.loaded.navigation.then((toc) => {
+    if (toc && toc.toc) {
+      tocOverlay.appendChild(createTocList(toc.toc));
+    } else if (Array.isArray(toc)) {
+      tocOverlay.appendChild(createTocList(toc));
+    }
   });
 }
 
@@ -1882,11 +1992,12 @@ async function prevPage() {
 
 function should_move_to_next(key)
 {
+  const isRtl = isEffectiveRtl();
   switch (key) {
   case 'ArrowLeft':
-    return (currentBookDirection === 'rtl');
+    return isRtl;
   case 'ArrowRight':
-    return !(currentBookDirection === 'rtl');
+    return !isRtl;
   case ' ':
     return true;
   case 'Backspace':
@@ -1935,6 +2046,10 @@ async function handleEpubKeyPress(event) {
     break;
   case 'd':
     toggleDarkMode();
+    break;
+  case 'v':
+    event.preventDefault();
+    toggleDirection();
     break;
   case 'm':
     toggleToc();
@@ -2020,6 +2135,7 @@ function generateHelpContent(bookType) {
       { key: '↓', description: 'Decrease font size' },
       { key: 'f', description: 'Toggle font (serif/sans-serif)' },
       { key: 'd', description: 'Toggle dark mode' },
+      { key: 'v', description: 'Toggle Vertical-RtL mode' },
       { key: 'm', description: 'Toggle TOC/Bookmark' },
       { key: 'b', description: 'Add/remove bookmark' },
       { key: '?', description: 'Show/hide this help' }
@@ -2690,7 +2806,7 @@ const IMPORT_VALIDATION_MAP = new Map([
   ['fontSize', (value) => typeof value === 'number' && value > 0],
   ['lineHeight', (value) => typeof value === 'number' && value > 0],
   ['font', (value) => ['serif', 'sans-serif'].includes(value)],
-  ['direction', (value) => ['ltr', 'rtl'].includes(value)],
+  ['direction', (value) => ['ltr', 'rtl', 'default'].includes(value)],
   ['soloPageExceptions', (value) => Array.isArray(value) && value.every(item => typeof item === 'number')]
 ]);
 
@@ -3372,8 +3488,7 @@ async function openComicBook(bookRecord, metadata) {
     currentBookDirection = directionFromComicInfo;
   }
 
-  document.getElementById('reader-view').dataset.direction = currentBookDirection;
-  updateDirectionButton();
+  updateReaderDirection();
 
   const slider = document.getElementById('progress-slider');
   const currentLabel = document.getElementById('progress-current-label');
@@ -3638,6 +3753,7 @@ function openRendition(bookData, metadata) {
   currentFontSize = 100;
   currentLineHeight = 1.5;
   currentFont = 'sans-serif';
+  currentBookDirection = 'default';
 
   if (metadata) {
     if (metadata.fontSize) {
@@ -3648,6 +3764,9 @@ function openRendition(bookData, metadata) {
     }
     if (metadata.font) {
       currentFont = metadata.font;
+    }
+    if (metadata.direction) {
+      currentBookDirection = metadata.direction;
     }
   }
 
@@ -3672,20 +3791,40 @@ function openRendition(bookData, metadata) {
 
   currentBook.ready.then(async () => {
     currentBookLocationsPromise = currentBook.locations.generate();
-    currentBookDirection = currentBook.packaging.metadata.direction || 'ltr';
-    document.getElementById('reader-view').dataset.direction = currentBookDirection;
+    if (!metadata || !metadata.direction) {
+      currentBookDirection = 'default';
+    }
+    updateReaderDirection();
 
     const renderOptions = {
       width: '100%',
-      height: '100%'
+      height: '100%',
+      flow: 'paginated'
     };
+
+    if (isEffectiveRtl()) {
+      renderOptions.direction = 'rtl';
+      renderOptions.defaultDirection = 'rtl';
+    }
 
     const isPrePaginated = currentBook.packaging.metadata.layout === 'pre-paginated';
     if (isPrePaginated) {
       renderOptions.layout = 'pre-paginated';
     }
 
+    currentBook.spine.hooks.content.register((doc) => {
+      if (currentBookDirection === 'rtl' && doc && doc.documentElement) {
+        doc.documentElement.style.setProperty('writing-mode', 'vertical-rl', 'important');
+        doc.documentElement.style.setProperty('-webkit-writing-mode', 'vertical-rl', 'important');
+        if (doc.body) {
+          doc.body.style.setProperty('writing-mode', 'vertical-rl', 'important');
+          doc.body.style.setProperty('-webkit-writing-mode', 'vertical-rl', 'important');
+        }
+      }
+    });
+
     currentRendition = currentBook.renderTo('viewer', renderOptions);
+    updateReaderDirection();
 
     const slider = document.getElementById('progress-slider');
     const currentLabel = document.getElementById('progress-current-label');
@@ -3738,6 +3877,7 @@ function openRendition(bookData, metadata) {
         }
         saveLastLocation();
       }
+      updateReaderDirection();
     });
 
     currentRendition.on('rendered', () => {
@@ -3750,6 +3890,8 @@ function openRendition(bookData, metadata) {
         iframeBody.addEventListener('touchend', toggleControls);
         view.iframe.contentWindow.focus();
       }
+      applyDirectionOverrides();
+      updateReaderDirection();
     });
 
     // Apply themes that might have been set before rendition was ready
@@ -3760,6 +3902,7 @@ function openRendition(bookData, metadata) {
       currentRendition.themes.override('color', '#e0e0e0');
       currentRendition.themes.override('background', '#121212');
     }
+    applyDirectionOverrides();
     updateTrcGroupVisibility();
 
     if (cfi) {
