@@ -153,10 +153,6 @@ function patchEpubJsForVerticalWriting() {
             axis = 'horizontal';
           }
 
-          if (isVertical && this.settings.flow === 'paginated') {
-            this.layout.delta = this.layout.width || this.layout.pageWidth;
-          }
-
           this.setAxis(axis);
           this.emit('axis', axis);
           this.setWritingMode(writingMode);
@@ -211,15 +207,19 @@ function patchEpubJsForVerticalWriting() {
             scalable: "no"
           });
           this.css("overflow-y", "hidden");
-          this.css("overflow-x", "visible");
           this.css("margin", "0", true);
-          this.css("padding", "20px", true);
+          this.css("padding-top", "20px");
+          this.css("padding-bottom", "20px");
+          this.css("padding-left", (gap / 2) + "px", true);
+          this.css("padding-right", (gap / 2) + "px", true);
+          this.css("box-sizing", "border-box");
+          this.css("max-width", "inherit");
           this.css("column-fill", "auto");
           this.css("column-gap", (gap || 0) + "px");
           this.css("column-width", columnWidth + "px");
           this.css("column-axis", "horizontal");
           this.css("-webkit-column-axis", "horizontal");
-          this.css("box-sizing", "border-box");
+          this.css("-webkit-line-box-contain", "block glyphs replaced");
           return;
         }
 
@@ -250,7 +250,7 @@ function patchEpubJsNavigation() {
         if (!target) return;
         var left = 0, top = 0;
         if (this.isPaginated) {
-          var delta = this.layout.delta || this.layout.pageWidth || this.container.offsetWidth;
+          var delta = this.layout.delta || this.layout.width || this.container.offsetWidth;
           var dir = this.settings.direction;
           var scrollType = this.settings.rtlScrollType;
           var scrollWidth = this.container.scrollWidth;
@@ -284,22 +284,21 @@ function patchEpubJsNavigation() {
         if (!this.views || !this.views.length) return;
 
         if (this.isPaginated && "horizontal" === this.settings.axis) {
-          var delta = this.layout.delta || this.layout.pageWidth || this.container.offsetWidth;
-          var containerWidth = this.container.offsetWidth;
+          var delta = this.layout.delta || this.layout.width || this.container.offsetWidth;
           var scrollWidth = this.container.scrollWidth;
           var scrollLeft = this.container.scrollLeft;
           var scrollType = this.settings.rtlScrollType;
 
           if (dir === 'rtl') {
             if (scrollType === 'default') {
-              if (scrollLeft + containerWidth + delta <= scrollWidth + 5) {
+              if (scrollLeft + delta <= scrollWidth - delta + 5) {
                 this.scrollBy(delta, 0, true);
               } else {
                 nextSection = this.views.last().section.next();
               }
             } else {
-              // Negative RTL: scrollLeft <= 0, scrolling left decreases scrollLeft towards -(scrollWidth - containerWidth)
-              if (Math.abs(scrollLeft) + containerWidth + 5 < scrollWidth) {
+              // Negative RTL: scrollLeft ranges from 0 down to -(scrollWidth - delta)
+              if (Math.abs(scrollLeft) + delta <= scrollWidth - delta + 5) {
                 this.scrollBy(delta, 0, true);
               } else {
                 nextSection = this.views.last().section.next();
@@ -307,7 +306,7 @@ function patchEpubJsNavigation() {
             }
           } else {
             // LTR
-            if (scrollLeft + containerWidth + 5 < scrollWidth) {
+            if (scrollLeft + delta <= scrollWidth - delta + 5) {
               this.scrollBy(delta, 0, true);
             } else {
               nextSection = this.views.last().section.next();
@@ -351,8 +350,7 @@ function patchEpubJsNavigation() {
         if (!this.views || !this.views.length) return;
 
         if (this.isPaginated && "horizontal" === this.settings.axis) {
-          var delta = this.layout.delta || this.layout.pageWidth || this.container.offsetWidth;
-          var containerWidth = this.container.offsetWidth;
+          var delta = this.layout.delta || this.layout.width || this.container.offsetWidth;
           var scrollWidth = this.container.scrollWidth;
           var scrollLeft = this.container.scrollLeft;
           var scrollType = this.settings.rtlScrollType;
