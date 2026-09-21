@@ -182,17 +182,18 @@ function patchEpubJsForVerticalWriting() {
 
   // 2. Patch Contents.prototype for accurate textWidth and columns in vertical writing mode
   try {
-    if (ePub.Contents && ePub.Contents.prototype && !ePub.Contents.prototype._lerVerticalWritingPatched) {
-      const origTextWidth = ePub.Contents.prototype.textWidth;
-      ePub.Contents.prototype.textWidth = function() {
+    const Contents = ePub.Contents;
+    if (Contents && Contents.prototype && !Contents.prototype._lerVerticalWritingPatched) {
+      const origTextWidth = Contents.prototype.textWidth;
+      Contents.prototype.textWidth = function() {
         let w = origTextWidth.call(this);
         let sw = this.scrollWidth ? this.scrollWidth() : 0;
         let docSw = (this.document && this.document.documentElement) ? this.document.documentElement.scrollWidth : 0;
         return Math.max(w, sw, docSw);
       };
 
-      const origColumns = ePub.Contents.prototype.columns;
-      ePub.Contents.prototype.columns = function(width, height, columnWidth, gap, dir) {
+      const origColumns = Contents.prototype.columns;
+      Contents.prototype.columns = function(width, height, columnWidth, gap, dir) {
         let writingMode = this.writingMode();
         let isVertical = writingMode && writingMode.indexOf("vertical") === 0;
 
@@ -225,205 +226,45 @@ function patchEpubJsForVerticalWriting() {
 
         return origColumns.call(this, width, height, columnWidth, gap, dir);
       };
-      ePub.Contents.prototype._lerVerticalWritingPatched = true;
+      Contents.prototype._lerVerticalWritingPatched = true;
     }
   } catch (e) {
     console.warn("Could not patch Contents for vertical writing:", e);
   }
-}
 
-function patchEpubJsNavigation() {
-  if (typeof ePub === 'undefined') return;
-
+  // 3. Patch DefaultViewManager.prototype.moveTo for RTL negative scrolling
   try {
     const DefaultViewManager = ePub.Rendition.prototype.requireManager('default');
-    if (DefaultViewManager && DefaultViewManager.prototype && !DefaultViewManager.prototype._lerNavPatched) {
-      const origUpdateAxis = DefaultViewManager.prototype.updateAxis;
-      DefaultViewManager.prototype.updateAxis = function(axis, force) {
-        if (this.isPaginated) {
-          axis = 'horizontal';
-        }
-        return origUpdateAxis.call(this, axis, force);
-      };
-
-      DefaultViewManager.prototype.moveTo = function(target) {
-        if (!target) return;
+    if (DefaultViewManager && DefaultViewManager.prototype && !DefaultViewManager.prototype._lerMoveToPatched) {
+      DefaultViewManager.prototype.moveTo = function(offset) {
+        if (!offset) return;
         var left = 0, top = 0;
-        if (this.isPaginated) {
-          var delta = this.layout.delta || this.layout.width || this.container.offsetWidth;
-          var dir = this.settings.direction;
-          var scrollType = this.settings.rtlScrollType;
-          var scrollWidth = this.container.scrollWidth;
-
-          if (dir === 'rtl') {
-            var targetPos = (target.left !== undefined) ? target.left : 0;
-            var pageIndex = Math.floor(targetPos / delta);
-
-            if (scrollType === 'default') {
-              left = pageIndex * delta;
-              left = Math.max(0, Math.min(scrollWidth - delta, left));
-            } else {
-              left = -pageIndex * delta;
-              var maxNegative = -(scrollWidth - delta);
-              left = Math.min(0, Math.max(maxNegative, left));
-            }
-          } else {
-            var pageIndex = Math.floor(target.left / delta);
-            left = pageIndex * delta;
-            left = Math.max(0, Math.min(scrollWidth - delta, left));
-          }
+        if (!this.isPaginated) {
+          top = offset.top || 0;
         } else {
-          top = target.top + this.container.scrollTop;
+          var delta = this.layout.delta || this.layout.width || this.container.offsetWidth;
+          var targetX = (offset.left !== undefined) ? offset.left : 0;
+          var pageOffset = Math.floor(targetX / delta) * delta;
+          if (this.settings.direction === 'rtl' && this.settings.rtlScrollType === 'negative') {
+            left = -pageOffset;
+          } else {
+            left = pageOffset;
+            if (left + delta > this.container.scrollWidth) {
+              left = this.container.scrollWidth - delta;
+            }
+          }
         }
         this.scrollTo(left, top, true);
       };
-
-      DefaultViewManager.prototype.next = function() {
-        var nextSection;
-        var dir = this.settings.direction;
-        if (!this.views || !this.views.length) return;
-
-        if (this.isPaginated && "horizontal" === this.settings.axis) {
-          var delta = this.layout.delta || this.layout.width || this.container.offsetWidth;
-          var scrollWidth = this.container.scrollWidth;
-          var scrollLeft = this.container.scrollLeft;
-          var scrollType = this.settings.rtlScrollType;
-
-          if (dir === 'rtl') {
-            if (scrollType === 'default') {
-              if (scrollLeft + delta <= scrollWidth - delta + 5) {
-                this.scrollBy(delta, 0, true);
-              } else {
-                nextSection = this.views.last().section.next();
-              }
-            } else {
-              // Negative RTL: scrollLeft ranges from 0 down to -(scrollWidth - delta)
-              if (Math.abs(scrollLeft) + delta <= scrollWidth - delta + 5) {
-                this.scrollBy(delta, 0, true);
-              } else {
-                nextSection = this.views.last().section.next();
-              }
-            }
-          } else {
-            // LTR
-            if (scrollLeft + delta <= scrollWidth - delta + 5) {
-              this.scrollBy(delta, 0, true);
-            } else {
-              nextSection = this.views.last().section.next();
-            }
-          }
-        } else if (this.isPaginated && "vertical" === this.settings.axis) {
-          var delta = this.layout.height || this.container.offsetHeight;
-          var offsetHeight = this.container.offsetHeight;
-          var scrollHeight = this.container.scrollHeight;
-          if (this.container.scrollTop + offsetHeight + 5 < scrollHeight) {
-            this.scrollBy(0, delta, true);
-          } else {
-            nextSection = this.views.last().section.next();
-          }
-        } else {
-          nextSection = this.views.last().section.next();
-        }
-
-        if (nextSection) {
-          this.clear();
-          var forceRight = false;
-          if ("pre-paginated" === this.layout.name && 2 === this.layout.divisor && nextSection.properties && nextSection.properties.includes("page-spread-right")) {
-            forceRight = true;
-          }
-          return this.append(nextSection, forceRight).then(function() {
-            return this.handleNextPrePaginated(forceRight, nextSection, this.append);
-          }.bind(this), t => t).then(function() {
-            if (this.isPaginated && "horizontal" === this.settings.axis) {
-              this.scrollTo(0, 0, true);
-            } else if (!this.isPaginated && "horizontal" === this.settings.axis && "rtl" === this.settings.direction && "default" === this.settings.rtlScrollType) {
-              this.scrollTo(this.container.scrollWidth, 0, true);
-            }
-            this.views.show();
-          }.bind(this));
-        }
-      };
-
-      DefaultViewManager.prototype.prev = function() {
-        var prevSection;
-        var dir = this.settings.direction;
-        if (!this.views || !this.views.length) return;
-
-        if (this.isPaginated && "horizontal" === this.settings.axis) {
-          var delta = this.layout.delta || this.layout.width || this.container.offsetWidth;
-          var scrollWidth = this.container.scrollWidth;
-          var scrollLeft = this.container.scrollLeft;
-          var scrollType = this.settings.rtlScrollType;
-
-          if (dir === 'rtl') {
-            if (scrollType === 'default') {
-              if (scrollLeft >= 5) {
-                this.scrollBy(-delta, 0, true);
-              } else {
-                prevSection = this.views.first().section.prev();
-              }
-            } else {
-              // Negative RTL: scrollLeft <= 0, scrolling right increases scrollLeft towards 0
-              if (Math.abs(scrollLeft) >= 5) {
-                this.scrollBy(-delta, 0, true);
-              } else {
-                prevSection = this.views.first().section.prev();
-              }
-            }
-          } else {
-            // LTR
-            if (scrollLeft >= 5) {
-              this.scrollBy(-delta, 0, true);
-            } else {
-              prevSection = this.views.first().section.prev();
-            }
-          }
-        } else if (this.isPaginated && "vertical" === this.settings.axis) {
-          var delta = this.layout.height || this.container.offsetHeight;
-          if (this.container.scrollTop >= 5) {
-            this.scrollBy(0, -delta, true);
-          } else {
-            prevSection = this.views.first().section.prev();
-          }
-        } else {
-          prevSection = this.views.first().section.prev();
-        }
-
-        if (prevSection) {
-          this.clear();
-          var forceRight = false;
-          if ("pre-paginated" === this.layout.name && 2 === this.layout.divisor && prevSection.properties && "object" != typeof prevSection.prev()) {
-            forceRight = true;
-          }
-          return this.prepend(prevSection, forceRight).then(function() {
-            var p;
-            if ("pre-paginated" === this.layout.name && this.layout.divisor > 1 && (p = prevSection.prev())) {
-              return this.prepend(p);
-            }
-          }.bind(this), t => t).then(function() {
-            if (this.isPaginated && "horizontal" === this.settings.axis) {
-              var lastPageOffset = Math.max(0, this.container.scrollWidth - this.layout.delta);
-              if ("rtl" === this.settings.direction && "default" !== this.settings.rtlScrollType) {
-                this.scrollTo(-lastPageOffset, 0, true);
-              } else {
-                this.scrollTo(lastPageOffset, 0, true);
-              }
-            }
-            this.views.show();
-          }.bind(this));
-        }
-      };
-
-      DefaultViewManager.prototype._lerNavPatched = true;
+      DefaultViewManager.prototype._lerMoveToPatched = true;
     }
   } catch (e) {
-    console.warn("Could not patch DefaultViewManager navigation:", e);
+    console.warn("Could not patch DefaultViewManager moveTo:", e);
   }
 }
 
 function patchEpubJs() {
   patchEpubJsForVerticalWriting();
-  patchEpubJsNavigation();
 }
 
 function setupScrollObserver() {
