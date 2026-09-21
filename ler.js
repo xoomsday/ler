@@ -256,16 +256,13 @@ function patchEpubJsNavigation() {
           var scrollWidth = this.container.scrollWidth;
 
           if (dir === 'rtl') {
-            var targetRight = (target.right !== undefined) ? target.right : (target.left + (target.width || 0));
-            var distFromRight = Math.max(0, scrollWidth - targetRight);
-            var pageIndex = Math.floor(distFromRight / delta);
+            var targetPos = (target.left !== undefined) ? target.left : 0;
+            var pageIndex = Math.floor(targetPos / delta);
 
             if (scrollType === 'default') {
-              // In default RTL, rightmost is scrollLeft = 0, scrolling left increases scrollLeft
               left = pageIndex * delta;
               left = Math.max(0, Math.min(scrollWidth - delta, left));
             } else {
-              // 'negative' RTL: rightmost is 0, scrolling left decreases scrollLeft towards -(scrollWidth - containerWidth)
               left = -pageIndex * delta;
               var maxNegative = -(scrollWidth - delta);
               left = Math.min(0, Math.max(maxNegative, left));
@@ -338,7 +335,9 @@ function patchEpubJsNavigation() {
           return this.append(nextSection, forceRight).then(function() {
             return this.handleNextPrePaginated(forceRight, nextSection, this.append);
           }.bind(this), t => t).then(function() {
-            if (!this.isPaginated && "horizontal" === this.settings.axis && "rtl" === this.settings.direction && "default" === this.settings.rtlScrollType) {
+            if (this.isPaginated && "horizontal" === this.settings.axis) {
+              this.scrollTo(0, 0, true);
+            } else if (!this.isPaginated && "horizontal" === this.settings.axis && "rtl" === this.settings.direction && "default" === this.settings.rtlScrollType) {
               this.scrollTo(this.container.scrollWidth, 0, true);
             }
             this.views.show();
@@ -405,14 +404,11 @@ function patchEpubJsNavigation() {
             }
           }.bind(this), t => t).then(function() {
             if (this.isPaginated && "horizontal" === this.settings.axis) {
-              if ("rtl" === this.settings.direction) {
-                if ("default" === this.settings.rtlScrollType) {
-                  this.scrollTo(this.container.scrollWidth - this.layout.delta, 0, true);
-                } else {
-                  this.scrollTo(-1 * (this.container.scrollWidth - this.layout.delta), 0, true);
-                }
+              var lastPageOffset = Math.max(0, this.container.scrollWidth - this.layout.delta);
+              if ("rtl" === this.settings.direction && "default" !== this.settings.rtlScrollType) {
+                this.scrollTo(-lastPageOffset, 0, true);
               } else {
-                this.scrollTo(this.container.scrollWidth - this.layout.delta, 0, true);
+                this.scrollTo(lastPageOffset, 0, true);
               }
             }
             this.views.show();
@@ -3881,6 +3877,10 @@ function openRendition(bookData, metadata) {
     });
 
     currentRendition.on('rendered', () => {
+      const isRtl = isEffectiveRtl();
+      if (currentRendition.manager && currentRendition.manager.settings.direction !== (isRtl ? 'rtl' : 'ltr')) {
+        currentRendition.manager.direction(isRtl ? 'rtl' : 'ltr');
+      }
       const view = currentRendition.manager.views.last();
       if (view && view.iframe) {
         const iframeBody = view.iframe.contentWindow.document.body;
