@@ -44,6 +44,10 @@ body.dark-mode {
   color: #fff;
 }
 
+.dark-mode .progress-bar {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
 .dark-mode #toc-overlay {
   background-color: rgba(0, 0, 0, 0.9);
   color: #fff;

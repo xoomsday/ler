@@ -2829,7 +2829,7 @@ function displayBooks(append = false) {
           const progress = document.createElement('div');
           progress.className = 'progress';
           progressBar.appendChild(progress);
-          tile.appendChild(progressBar);
+          cover.appendChild(progressBar);
 
           const bookMeta = metadataMap.get(book.id);
           if (bookMeta && bookMeta.progress) {
@@ -2962,7 +2962,10 @@ function displayBooks(append = false) {
                 cover.appendChild(img);
                 coverObserver.observe(img);
               } else {
-                cover.textContent = 'No cover';
+                const placeholder = document.createElement('span');
+                placeholder.className = 'no-cover-placeholder';
+                placeholder.textContent = 'No cover';
+                cover.appendChild(placeholder);
               }
             });
           }
