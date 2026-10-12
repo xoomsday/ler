@@ -71,6 +71,11 @@ function setupScrollObserver() {
 }
 
 
+const TOP_CONTROL_TOUCH_RATIO = 0.2;
+let isTouchDevice = false;
+let lastTouchTime = 0;
+let touchStartPos = null;
+
 function showControls() {
   const readerView = document.getElementById('reader-view');
   const controls = document.getElementById('reader-controls');
@@ -84,8 +89,14 @@ function showControls() {
 function hideControls() {
   const readerView = document.getElementById('reader-view');
   const controls = document.getElementById('reader-controls');
+  const tocOverlay = document.getElementById('toc-overlay');
+  clearTimeout(controlsTimer);
   controls.classList.add('controls-hidden');
   readerView.classList.remove('controls-visible');
+  if (tocOverlay) {
+    tocOverlay.style.display = 'none';
+    tocOverlay.dataset.content = '';
+  }
 }
 
 function toggleControls() {
@@ -97,12 +108,131 @@ function toggleControls() {
   }
 }
 
+function resetControlsTimerIfActive() {
+  const readerView = document.getElementById('reader-view');
+  const tocOverlay = document.getElementById('toc-overlay');
+  if (readerView.classList.contains('controls-visible') &&
+      tocOverlay.style.display === 'none') {
+    clearTimeout(controlsTimer);
+    controlsTimer = setTimeout(hideControls, 3000);
+  }
+}
+
+function markTouchInteraction() {
+  lastTouchTime = Date.now();
+  if (!isTouchDevice) {
+    isTouchDevice = true;
+    const readerView = document.getElementById('reader-view');
+    if (readerView) {
+      readerView.classList.add('touch-friendly');
+      removeMouseHandlers(readerView);
+    }
+    document.querySelectorAll('#viewer iframe').forEach(iframe => {
+      if (iframe.contentWindow) {
+        removeMouseHandlers(iframe.contentWindow);
+      }
+    });
+  }
+}
+
+function isSyntheticMouseEvent(event) {
+  if (event && event.sourceCapabilities &&
+      event.sourceCapabilities.firesTouchEvents) {
+    return true;
+  }
+  return (Date.now() - lastTouchTime) < 1000;
+}
+
+function isInteractiveTarget(target) {
+  if (!target || !target.closest) return false;
+  return Boolean(target.closest('a, button, input, select, textarea, label'));
+}
+
+function handleMouseMove(event) {
+  if (isTouchDevice || isSyntheticMouseEvent(event)) {
+    return;
+  }
+  if (event.target && event.target.closest &&
+      event.target.closest('#prev-page-area, #next-page-area')) {
+    return;
+  }
+  showControls();
+}
+
 function addMouseHandler(element) {
-  element.addEventListener('mousemove', showControls);
+  if (isTouchDevice) return;
+  element.addEventListener('mousemove', handleMouseMove);
 }
 
 function removeMouseHandlers(element) {
-  element.removeEventListener('mousemove', showControls);
+  element.removeEventListener('mousemove', handleMouseMove);
+}
+
+function handleContentTouchStart(event) {
+  markTouchInteraction();
+  if (event.touches && event.touches.length === 1) {
+    const touch = event.touches[0];
+    touchStartPos = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now()
+    };
+  } else {
+    touchStartPos = null;
+  }
+}
+
+function handleContentTouchEnd(event, iframeElement = null) {
+  markTouchInteraction();
+  if (isInteractiveTarget(event.target)) {
+    touchStartPos = null;
+    return;
+  }
+  if (!touchStartPos || !event.changedTouches ||
+      event.changedTouches.length !== 1) {
+    touchStartPos = null;
+    return;
+  }
+
+  const touch = event.changedTouches[0];
+  const dx = Math.abs(touch.clientX - touchStartPos.x);
+  const dy = Math.abs(touch.clientY - touchStartPos.y);
+  const dt = Date.now() - touchStartPos.time;
+  touchStartPos = null;
+
+  // Ignore swipes, drags, or long presses
+  if (dx > 15 || dy > 15 || dt > 500) {
+    return;
+  }
+
+  const readerView = document.getElementById('reader-view');
+  const screenHeight = readerView.clientHeight || window.innerHeight;
+  let touchY = touch.clientY;
+  if (iframeElement) {
+    const rect = iframeElement.getBoundingClientRect();
+    touchY += rect.top;
+  }
+
+  if (touchY <= screenHeight * TOP_CONTROL_TOUCH_RATIO) {
+    toggleControls();
+  } else if (readerView.classList.contains('controls-visible')) {
+    hideControls();
+  }
+}
+
+function handleContentMouseClick(event) {
+  if (isSyntheticMouseEvent(event)) {
+    return;
+  }
+  if (isInteractiveTarget(event.target)) {
+    return;
+  }
+  const doc = event.target ? event.target.ownerDocument : document;
+  const selection = doc.getSelection ? doc.getSelection() : window.getSelection();
+  if (selection && selection.toString().length > 0) {
+    return;
+  }
+  toggleControls();
 }
 
 function updateRubyCache(base, pronunciation) {
@@ -648,35 +778,70 @@ window.addEventListener('load', async () => {
     }
   });
 
-  addCallback('prev-page-area', 'click', (event) => {
+  const handlePrevPageArea = (event) => {
+    event.stopPropagation();
     if (currentBookDirection === 'rtl') {
       nextPage();
     } else {
       prevPage();
     }
+  };
+
+  const handleNextPageArea = (event) => {
+    event.stopPropagation();
+    if (currentBookDirection === 'rtl') {
+      prevPage();
+    } else {
+      nextPage();
+    }
+  };
+
+  addCallback('prev-page-area', 'touchstart', (event) => {
+    markTouchInteraction();
+    event.stopPropagation();
+  });
+
+  addCallback('prev-page-area', 'touchend', (event) => {
+    markTouchInteraction();
+    event.preventDefault();
+    handlePrevPageArea(event);
+  });
+
+  addCallback('prev-page-area', 'click', (event) => {
+    event.stopPropagation();
+    if (isSyntheticMouseEvent(event)) return;
+    handlePrevPageArea(event);
+  });
+
+  addCallback('next-page-area', 'touchstart', (event) => {
+    markTouchInteraction();
+    event.stopPropagation();
+  });
+
+  addCallback('next-page-area', 'touchend', (event) => {
+    markTouchInteraction();
+    event.preventDefault();
+    handleNextPageArea(event);
   });
 
   addCallback('next-page-area', 'click', (event) => {
-    if (currentBookDirection === 'rtl') {
-      prevPage();
-    } else {
-      nextPage();
-    }
+    event.stopPropagation();
+    if (isSyntheticMouseEvent(event)) return;
+    handleNextPageArea(event);
   });
 
-  // Touch detection
-  window.addEventListener('touchstart', function onFirstTouch() {
-    const readerView = document.getElementById('reader-view');
-    readerView.classList.add('touch-friendly');
-    // Remove mousemove listener if it was added
-    removeMouseHandlers(readerView);
-    // Also remove from iframe if it exists (for epub)
-    const viewerIframe = document.querySelector('#viewer iframe');
-    if (viewerIframe && viewerIframe.contentWindow) {
-      removeMouseHandlers(viewerIframe.contentWindow);
-    }
-    window.removeEventListener('touchstart', onFirstTouch, false);
-  }, false);
+  const viewer = document.getElementById('viewer');
+  viewer.addEventListener('touchstart', handleContentTouchStart, { passive: true });
+  viewer.addEventListener('touchend', (event) => handleContentTouchEnd(event));
+  viewer.addEventListener('click', handleContentMouseClick);
+
+  const readerControls = document.getElementById('reader-controls');
+  ['touchstart', 'touchmove', 'touchend', 'click', 'input'].forEach(evtName => {
+    readerControls.addEventListener(evtName, resetControlsTimerIfActive, { passive: true });
+  });
+
+  // Track touch interactions across the app
+  window.addEventListener('touchstart', markTouchInteraction, { passive: true });
 
   addCallback('sort-by', 'change', () => displayBooks());
 
@@ -956,7 +1121,7 @@ async function closeReader() {
   const readerView = document.getElementById('reader-view');
   window.removeEventListener('keydown', handleKeyPress);
   removeMouseHandlers(readerView);
-  clearTimeout(controlsTimer);
+  hideControls();
 
   if (currentSliderInputHandler) {
     const slider = document.getElementById('progress-slider');
@@ -1263,6 +1428,7 @@ async function resetFontSettings() {
 }
 
 function toggleOverlay(type) {
+  const readerView = document.getElementById('reader-view');
   const tocOverlay = document.getElementById('toc-overlay');
   const controls = document.getElementById('reader-controls');
   const currentContent = tocOverlay.dataset.content;
@@ -1277,6 +1443,7 @@ function toggleOverlay(type) {
     // Show the overlay, and cancel any pending auto-hide
     clearTimeout(controlsTimer);
     controls.classList.remove('controls-hidden');
+    readerView.classList.add('controls-visible');
 
     elementStyle('help-overlay').display = 'none';
     tocOverlay.style.display = 'block';
@@ -3063,14 +3230,11 @@ async function openComicBook(bookRecord, metadata) {
   const readerView = document.getElementById('reader-view');
   readerView.style.display = 'block';
   readerView.classList.add('comic-mode'); // Add class to hide epub controls
+  hideControls();
   updateTrcGroupVisibility();
 
   window.addEventListener('keydown', handleKeyPress);
   addMouseHandler(readerView);
-
-  const viewer = document.getElementById('viewer');
-  viewer.addEventListener('click', toggleControls);
-  viewer.addEventListener('touchend', toggleControls);
 
   let title = bookRecord.name || '';
   document.getElementById('book-title-display').textContent =
@@ -3406,6 +3570,7 @@ function openRendition(bookData, metadata) {
   elementStyle('book-management').display = 'none';
   const readerView = document.getElementById('reader-view');
   readerView.style.display = 'block';
+  hideControls();
 
   window.addEventListener('keydown', handleKeyPress);
   addMouseHandler(readerView);
@@ -3487,15 +3652,17 @@ function openRendition(bookData, metadata) {
       }
     });
 
-    currentRendition.on('rendered', () => {
-      const view = currentRendition.manager.views.last();
+    currentRendition.on('rendered', (section, renderedView) => {
+      const view = renderedView || currentRendition.manager.views.last();
       if (view && view.iframe) {
-        const iframeBody = view.iframe.contentWindow.document.body;
-        view.iframe.contentWindow.addEventListener('keydown', handleKeyPress);
-        addMouseHandler(view.iframe.contentWindow);
-        iframeBody.addEventListener('click', toggleControls);
-        iframeBody.addEventListener('touchend', toggleControls);
-        view.iframe.contentWindow.focus();
+        const iframeWin = view.iframe.contentWindow;
+        const iframeDoc = iframeWin.document;
+        iframeWin.addEventListener('keydown', handleKeyPress);
+        addMouseHandler(iframeWin);
+        iframeDoc.addEventListener('touchstart', handleContentTouchStart, { passive: true });
+        iframeDoc.addEventListener('touchend', (event) => handleContentTouchEnd(event, view.iframe));
+        iframeDoc.addEventListener('click', handleContentMouseClick);
+        iframeWin.focus();
       }
     });
 

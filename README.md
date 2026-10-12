@@ -116,8 +116,9 @@ the browser's IndexedDB.
     *   **Immersive Reader Interface**:
         *   **Auto-Hiding Controls**: To minimize distractions, the top
           control bar and the side page-turn buttons automatically fade
-          out during reading. They reappear on mouse movement or a tap
-          on the main content area.
+          out during reading. They reappear on mouse movement, mouse
+          click on the main content area, or a tap near the top edge
+          (top 1/5) of the screen on touch devices.
         *   **Book Title Display**: The title of the current book is
           shown in the center of the top control bar.
         *   **Intuitive Display Controls**: Font size, line height, and
@@ -160,10 +161,13 @@ the browser's IndexedDB.
       fully interactive, allowing you to click on hyperlinks within
       the EPUB text (e.g., in a table of contents page).
     *   **Touch & Mouse Navigation**:
-        *   Click the thumb-sized `‹` and `›` buttons on the left and
-          right edges of the screen to turn pages.
-        *   Move the mouse or tap/click on the book's main content
-          area (but not on a link) to show the navigation controls.
+        *   Click or tap the thumb-sized `‹` and `›` buttons on the left
+          and right edges of the screen to turn pages without opening
+          the top control bar.
+        *   Move the mouse, click on the book's main content area with a
+          mouse, or tap near the top edge (top 1/5) of the screen on
+          touch devices (but not on a link) to show the navigation
+          controls.
     *   **Close Reader**: Return to the book management view.
 
 ## How to Use
@@ -184,9 +188,10 @@ the browser's IndexedDB.
     delete it or change its state.
 6.  **Navigate**:
     *   **Keyboard**: Use the `ArrowLeft` and `ArrowRight` keys.
-    *   **Touch/Mouse**: Click the `‹` and `›` buttons on the screen
+    *   **Touch/Mouse**: Click/tap the `‹` and `›` buttons on the screen
       edges.
-7.  **Show Controls**: Move your mouse, or tap/click the book's text.
+7.  **Show Controls**: Move your mouse, click the book's content, or tap
+    near the top edge of the screen on touch devices.
 8.  **Adjust Display (EPUB)**: Use the on-screen pill controls to
     adjust font size, line height, and font face, or use the
     corresponding keyboard shortcuts (`+`/`-`/`[`/`]`/`f`). Press `0`
