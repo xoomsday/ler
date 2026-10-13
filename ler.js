@@ -31,6 +31,7 @@ let comicInfoPageLayouts = new Map();
 let synth = window.speechSynthesis;
 let currentUtterance = null;
 let isAutoReading = false;
+let isTTSPaused = false;
 let ttsRate = 1.0;
 let ttsPitch = 1.0;
 let isSelectionModeActive = false;
@@ -407,10 +408,12 @@ function updateTTSRate(newRate) {
   ttsRate = Math.max(0.1, Math.min(10, parseFloat(newRate.toFixed(1))));
   document.getElementById('tts-rate-value').textContent = ttsRate.toFixed(1);
   localStorage.setItem('ler-tts-rate', ttsRate);
-  // If speaking, restart to apply new rate
+  // If speaking, restart to apply new rate; if paused, cancel old utterance so resume uses new rate
   if (isAutoReading) {
     cancelCurrentUtterance();
-    readCurrentPage();
+    if (!isTTSPaused) {
+      readCurrentPage();
+    }
   }
 }
 
@@ -418,10 +421,12 @@ function updateTTSPitch(newPitch) {
   ttsPitch = Math.max(0, Math.min(2, parseFloat(newPitch.toFixed(1))));
   document.getElementById('tts-pitch-value').textContent = ttsPitch.toFixed(1);
   localStorage.setItem('ler-tts-pitch', ttsPitch);
-  // If speaking, restart to apply new pitch
+  // If speaking, restart to apply new pitch; if paused, cancel old utterance so resume uses new pitch
   if (isAutoReading) {
     cancelCurrentUtterance();
-    readCurrentPage();
+    if (!isTTSPaused) {
+      readCurrentPage();
+    }
   }
 }
 
@@ -489,11 +494,17 @@ function togglePlayPause() {
   const playButton = document.getElementById('tts-play');
   const pauseButton = document.getElementById('tts-pause');
 
-  if (synth.paused) { // It's paused, so resume
-    synth.resume();
+  if (isAutoReading && isTTSPaused) { // It's paused, so resume
+    isTTSPaused = false;
+    if (synth.paused && currentUtterance) {
+      synth.resume();
+    } else {
+      readCurrentPage();
+    }
     playButton.style.display = 'none';
     pauseButton.style.display = 'inline-block';
-  } else if (synth.speaking) { // It's speaking, so pause
+  } else if (isAutoReading) { // It's speaking, so pause
+    isTTSPaused = true;
     synth.pause();
     playButton.style.display = 'inline-block';
     pauseButton.style.display = 'none';
@@ -509,6 +520,7 @@ function elementStyle(element) {
 function startReading() {
   if (!synth) return;
   isAutoReading = true;
+  isTTSPaused = false;
   readCurrentPage();
 
   document.getElementById('reader-view').classList.add('tts-active');
@@ -519,6 +531,7 @@ function startReading() {
 
 function stopReading() {
   isAutoReading = false;
+  isTTSPaused = false;
   cancelCurrentUtterance();
   currentChunks = [];
   currentChunkIndex = 0;
