@@ -392,13 +392,24 @@ function chunkText(text) {
   return chunks;
 }
 
+function cancelCurrentUtterance() {
+  if (currentUtterance) {
+    currentUtterance.onend = null;
+    currentUtterance.onerror = null;
+    currentUtterance = null;
+  }
+  if (synth) {
+    synth.cancel();
+  }
+}
+
 function updateTTSRate(newRate) {
   ttsRate = Math.max(0.1, Math.min(10, parseFloat(newRate.toFixed(1))));
   document.getElementById('tts-rate-value').textContent = ttsRate.toFixed(1);
   localStorage.setItem('ler-tts-rate', ttsRate);
   // If speaking, restart to apply new rate
   if (isAutoReading) {
-    if (synth) synth.cancel();
+    cancelCurrentUtterance();
     readCurrentPage();
   }
 }
@@ -409,7 +420,7 @@ function updateTTSPitch(newPitch) {
   localStorage.setItem('ler-tts-pitch', ttsPitch);
   // If speaking, restart to apply new pitch
   if (isAutoReading) {
-    if (synth) synth.cancel();
+    cancelCurrentUtterance();
     readCurrentPage();
   }
 }
@@ -435,12 +446,14 @@ async function readCurrentPage() {
   }
 
   const text = currentChunks[currentChunkIndex];
-  currentUtterance = new SpeechSynthesisUtterance(text);
-  currentUtterance.lang = currentBookLanguage;
-  currentUtterance.rate = ttsRate;
-  currentUtterance.pitch = ttsPitch;
+  const utterance = new SpeechSynthesisUtterance(text);
+  currentUtterance = utterance;
+  utterance.lang = currentBookLanguage;
+  utterance.rate = ttsRate;
+  utterance.pitch = ttsPitch;
 
-  currentUtterance.onend = async () => {
+  utterance.onend = async () => {
+    if (utterance !== currentUtterance) return;
     if (isAutoReading) {
       currentChunkIndex++;
       if (currentChunkIndex < currentChunks.length) {
@@ -455,12 +468,16 @@ async function readCurrentPage() {
     }
   };
 
-  currentUtterance.onerror = (event) => {
+  utterance.onerror = (event) => {
+    if (utterance !== currentUtterance) return;
+    if (event.error === 'canceled' || event.error === 'interrupted') {
+      return;
+    }
     console.error('SpeechSynthesisUtterance.onerror', event);
     stopReading();
   };
 
-  synth.speak(currentUtterance);
+  synth.speak(utterance);
 }
 
 function togglePlayPause() {
@@ -502,10 +519,7 @@ function startReading() {
 
 function stopReading() {
   isAutoReading = false;
-  if (synth) {
-    synth.cancel();
-  }
-  currentUtterance = null;
+  cancelCurrentUtterance();
   currentChunks = [];
   currentChunkIndex = 0;
 

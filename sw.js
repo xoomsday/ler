@@ -1,4 +1,4 @@
-const CACHE_SERIAL = '31';
+const CACHE_SERIAL = '32';
 const CACHE_BASE = 'ler-cache-';
 const CACHE_NAME = CACHE_BASE + CACHE_SERIAL;
 
