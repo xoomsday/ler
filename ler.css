@@ -448,7 +448,7 @@ h1 {
 }
 
 #reader-controls #close-reader {
-  order: 99; /* Push to the end */
+  flex-shrink: 0;
   margin-left: auto;
 }
 
@@ -762,9 +762,8 @@ h1 {
 }
 
 #book-title-display {
-  /* flex-grow: 10;  High grow factor to take up space */
-  /* flex-shrink: 1; */
-  flex-basis: 10em; /* Start with a decent basis */
+  flex: 1 1 0;
+  min-width: 0;
   text-align: center;
   color: #333;
   white-space: nowrap;
@@ -775,9 +774,9 @@ h1 {
 .trc-title-close-group {
   display: flex;
   align-items: center;
-  flex-grow: 1;
-  flex-shrink: 1;
-  flex-basis: 15em; /* Give it a base width to influence wrapping */
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   gap: 1em; /* Space between title and close button */
 }
 
