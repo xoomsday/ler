@@ -635,7 +635,8 @@ h1 {
   display: none;
 }
 
-.comic-mode #dark-mode-pill {
+.comic-mode #dark-mode-pill,
+.comic-mode #fullscreen-pill {
   display: flex;
 }
 

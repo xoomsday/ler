@@ -758,6 +758,7 @@ window.addEventListener('load', async () => {
   addCallback('line-height-dec', 'click', decreaseLineHeight);
   addCallback('line-height-inc', 'click', increaseLineHeight);
   addCallback('dark-mode-toggle', 'click', toggleDarkMode);
+  addCallback('fullscreen-toggle', 'click', toggleFullscreen);
   addCallback('font-toggle', 'click', toggleFont);
   addCallback('direction-toggle', 'click', toggleDirection);
   addCallback('spread-toggle', 'click', toggleSpread);
@@ -1300,6 +1301,18 @@ async function decreaseLineHeight() {
     currentRendition.themes.override('line-height', currentLineHeight);
     document.getElementById('line-height-value').textContent = currentLineHeight;
     await saveBookSettings();
+  }
+}
+
+async function toggleFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+    } else if (document.exitFullscreen) {
+      await document.exitFullscreen();
+    }
+  } catch (err) {
+    console.error('Error toggling fullscreen:', err);
   }
 }
 
