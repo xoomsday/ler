@@ -640,6 +640,16 @@ h1 {
   display: flex;
 }
 
+#tts-rate-pill,
+#tts-pitch-pill {
+  display: none;
+}
+
+#reader-view.tts-active:not(.comic-mode) #tts-rate-pill,
+#reader-view.tts-active:not(.comic-mode) #tts-pitch-pill {
+  display: flex;
+}
+
 #direction-toggle-pill {
   display: none;
 }
@@ -784,7 +794,10 @@ h1 {
 /* Give the groups a low shrink factor so they stay together */
 .trc-group {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     align-items: center;
     gap: 1em;
+    max-width: 100%;
     flex-shrink: 0; /* Prevent shrinking of groups */
 }

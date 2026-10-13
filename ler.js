@@ -494,6 +494,7 @@ function startReading() {
   isAutoReading = true;
   readCurrentPage();
 
+  document.getElementById('reader-view').classList.add('tts-active');
   elementStyle('tts-play').display = 'none';
   elementStyle('tts-pause').display = 'inline-block';
   elementStyle('tts-stop').display = 'inline-block';
@@ -508,6 +509,7 @@ function stopReading() {
   currentChunks = [];
   currentChunkIndex = 0;
 
+  document.getElementById('reader-view').classList.remove('tts-active');
   elementStyle('tts-play').display = 'inline-block';
   elementStyle('tts-pause').display = 'none';
   elementStyle('tts-stop').display = 'none';
