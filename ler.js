@@ -527,6 +527,7 @@ function startReading() {
   elementStyle('tts-play').display = 'none';
   elementStyle('tts-pause').display = 'inline-block';
   elementStyle('tts-stop').display = 'inline-block';
+  updateTocOverlayPosition();
 }
 
 function stopReading() {
@@ -540,6 +541,7 @@ function stopReading() {
   elementStyle('tts-play').display = 'inline-block';
   elementStyle('tts-pause').display = 'none';
   elementStyle('tts-stop').display = 'none';
+  updateTocOverlayPosition();
 }
 
 function enterSelectionMode() {
@@ -802,6 +804,7 @@ window.addEventListener('load', async () => {
   addCallback('tts-pitch-down', 'click', () => updateTTSPitch(ttsPitch - 0.1));
 
   window.addEventListener('resize', () => {
+    updateTocOverlayPosition();
     if (currentBookType === 'cbz' &&
         elementStyle('reader-view').display === 'block') {
       displayComicPage(currentComicPage);
@@ -1469,6 +1472,17 @@ async function resetFontSettings() {
   await saveBookSettings();
 }
 
+function updateTocOverlayPosition() {
+  const tocOverlay = document.getElementById('toc-overlay');
+  const controls = document.getElementById('reader-controls');
+  if (!tocOverlay || !controls || tocOverlay.style.display === 'none') {
+    return;
+  }
+  const controlsHeight = controls.offsetHeight;
+  tocOverlay.style.top = `${controlsHeight}px`;
+  tocOverlay.style.height = `calc(100% - ${controlsHeight}px)`;
+}
+
 function toggleOverlay(type) {
   const readerView = document.getElementById('reader-view');
   const tocOverlay = document.getElementById('toc-overlay');
@@ -1490,6 +1504,7 @@ function toggleOverlay(type) {
     elementStyle('help-overlay').display = 'none';
     tocOverlay.style.display = 'block';
     tocOverlay.dataset.content = type;
+    updateTocOverlayPosition();
     if (type === 'toc') {
       generateToc();
     } else if (type === 'bookmarks') {
