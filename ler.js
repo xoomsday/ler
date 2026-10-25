@@ -770,6 +770,9 @@ window.addEventListener('load', async () => {
 
   await initDB();
   await migrateBookmarksFromLocalStorage();
+  restoreStateFilters();
+  restoreSortBy();
+  await populateTagFilter();
   await displayBooks();
   startBackgroundHashMigration(); // Start background hashing
 
@@ -876,7 +879,10 @@ window.addEventListener('load', async () => {
   // Track touch interactions across the app
   window.addEventListener('touchstart', markTouchInteraction, { passive: true });
 
-  addCallback('sort-by', 'change', () => displayBooks());
+  addCallback('sort-by', 'change', () => {
+    saveSortBy();
+    displayBooks();
+  });
 
   // --- New State Filter Dropdown Logic ---
   const stateFilterOptions = document.getElementById('state-filter-options');
@@ -952,11 +958,15 @@ window.addEventListener('load', async () => {
   });
 
   // --- Event Listeners for Filter Changes ---
-  stateFilterOptions.addEventListener('change', () => displayBooks());
-  tagFilterOptions.addEventListener('change', () => displayBooks());
+  stateFilterOptions.addEventListener('change', () => {
+    saveStateFilters();
+    displayBooks();
+  });
+  tagFilterOptions.addEventListener('change', () => {
+    saveTagFilters();
+    displayBooks();
+  });
   importFileInput.addEventListener('change', importProgress);
-
-  populateTagFilter(); // Populate tags on load
 
   // Bulk action event listeners
   addCallback('bulk-cancel', 'click', exitSelectionMode);
@@ -978,6 +988,52 @@ window.addEventListener('load', async () => {
   });
   setupScrollObserver();
 });
+
+function saveStateFilters() {
+  const checkedStates = [
+    ...document.querySelectorAll('#state-filter-options input[name="state"]:checked')
+  ].map(cb => cb.value);
+  localStorage.setItem('ler-filter-states', JSON.stringify(checkedStates));
+}
+
+function restoreStateFilters() {
+  const saved = localStorage.getItem('ler-filter-states');
+  if (!saved) return;
+  try {
+    const savedStates = JSON.parse(saved);
+    if (Array.isArray(savedStates)) {
+      const savedSet = new Set(savedStates);
+      document.querySelectorAll('#state-filter-options input[name="state"]').forEach(cb => {
+        cb.checked = savedSet.has(cb.value);
+      });
+    }
+  } catch (e) {
+    console.warn('Could not restore state filters:', e);
+  }
+}
+
+function saveTagFilters() {
+  const checkedTags = [
+    ...document.querySelectorAll('#tag-filter-options input[name="tag"]:checked')
+  ].map(cb => parseInt(cb.value, 10));
+  localStorage.setItem('ler-filter-tags', JSON.stringify(checkedTags));
+}
+
+function saveSortBy() {
+  const sortBySelect = document.getElementById('sort-by');
+  if (sortBySelect) {
+    localStorage.setItem('ler-sort-by', sortBySelect.value);
+  }
+}
+
+function restoreSortBy() {
+  const savedSortBy = localStorage.getItem('ler-sort-by');
+  const sortBySelect = document.getElementById('sort-by');
+  if (savedSortBy && sortBySelect &&
+      [...sortBySelect.options].some(opt => opt.value === savedSortBy)) {
+    sortBySelect.value = savedSortBy;
+  }
+}
 
 async function populateTagFilter() {
   const optionsContainer = document.getElementById('tag-filter-options');
@@ -1001,12 +1057,26 @@ async function populateTagFilter() {
     return;
   }
 
+  let savedTagIds = new Set();
+  const savedTagsJson = localStorage.getItem('ler-filter-tags');
+  if (savedTagsJson) {
+    try {
+      const parsed = JSON.parse(savedTagsJson);
+      if (Array.isArray(parsed)) {
+        savedTagIds = new Set(parsed.map(id => parseInt(id, 10)));
+      }
+    } catch (e) {
+      console.warn('Could not restore tag filters:', e);
+    }
+  }
+
   tags.forEach(tag => {
     const label = document.createElement('label');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.name = 'tag';
     checkbox.value = tag.id;
+    checkbox.checked = savedTagIds.has(tag.id);
     label.appendChild(checkbox);
     label.appendChild(document.createTextNode(` ${tag.name}`));
     optionsContainer.appendChild(label);
