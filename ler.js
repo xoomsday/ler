@@ -11,6 +11,10 @@ const STORE_BOOK_TAGS_NAME = 'book_tags';
 let db;
 let currentBook;
 let currentCbzTaskId = 256;
+let currentEpubNavTaskId = 0;
+let currentStableEpubCfi = null;
+let epubResizeTimer = null;
+let pendingEpubRestoreCfi = null;
 let currentRendition;
 let currentBookId = null;
 let currentBookType = null;
@@ -814,6 +818,24 @@ window.addEventListener('load', async () => {
     }
   });
 
+  document.addEventListener('visibilitychange', () => {
+    if (!currentRendition || currentBookType !== 'epub' ||
+        elementStyle('reader-view').display !== 'block') {
+      return;
+    }
+    if (document.visibilityState === 'hidden') {
+      if (currentStableEpubCfi) {
+        pendingEpubRestoreCfi = pendingEpubRestoreCfi || currentStableEpubCfi;
+      }
+      isNavigating = true;
+    } else if (document.visibilityState === 'visible') {
+      scheduleEpubResizeRestore(
+        pendingEpubRestoreCfi || currentStableEpubCfi,
+        true
+      );
+    }
+  });
+
   const handlePrevPageArea = (event) => {
     event.stopPropagation();
     if (currentBookDirection === 'rtl') {
@@ -1218,6 +1240,14 @@ async function closeReader() {
   if (isClosing) return; // Prevent re-entrancy
   isClosing = true;
 
+  if (epubResizeTimer) {
+    clearTimeout(epubResizeTimer);
+    epubResizeTimer = null;
+  }
+  pendingEpubRestoreCfi = null;
+  ++currentEpubNavTaskId;
+  isNavigating = false;
+
   stopReading(); // Stop any active TTS
   await saveLastLocation();
 
@@ -1253,6 +1283,7 @@ async function closeReader() {
   currentBookType = null;
   currentBookDirection = 'ltr';
   currentBookLocationsPromise = null;
+  currentStableEpubCfi = null;
   document.title = 'Local Ebook Reader';
 
   isClosing = false; // Release the lock
@@ -1295,7 +1326,15 @@ async function saveLastLocation(setFinished) {
       let progress = null;
       const locations = currentBook.locations;
       const location = currentRendition.currentLocation();
-      const cfi = location.start.cfi;
+      const cfi = (location && location.start && location.start.cfi)
+        ? location.start.cfi
+        : currentStableEpubCfi;
+      if (!cfi) {
+        return;
+      }
+      if (document.visibilityState !== 'hidden' && !pendingEpubRestoreCfi) {
+        currentStableEpubCfi = cfi;
+      }
       const locationIndex = locations.locationFromCfi(cfi);
       if (locationIndex !== -1 && locations.total > 0) {
         progress = locationIndex / locations.total;
@@ -1690,18 +1729,77 @@ async function generateBookmarksList() {
   };
 }
 
-async function gotoCFI(cfi) {
-  if (!currentRendition || isNavigating) return;
+function isCfiOnCurrentPage(cfi) {
+  if (!currentRendition || !cfi || !currentRendition.manager ||
+      !currentRendition.manager.views ||
+      currentRendition.manager.views.length === 0) {
+    return false;
+  }
+  const loc = currentRendition.currentLocation();
+  if (!loc || !loc.start || !loc.end || !loc.start.cfi || !loc.end.cfi) {
+    return false;
+  }
+  try {
+    const cmpStart = currentRendition.epubcfi.compare(cfi, loc.start.cfi);
+    const cmpEnd = currentRendition.epubcfi.compare(cfi, loc.end.cfi);
+    return cmpStart >= 0 && cmpEnd <= 0;
+  } catch (e) {
+    return false;
+  }
+}
 
+function scheduleEpubResizeRestore(targetCfi, checkCurrentPageFirst = false) {
+  if (!currentRendition || currentBookType !== 'epub') return;
+  const cfiToRestore = targetCfi || pendingEpubRestoreCfi || currentStableEpubCfi;
+  if (!cfiToRestore) return;
+
+  pendingEpubRestoreCfi = cfiToRestore;
+  isNavigating = true;
+  ++currentEpubNavTaskId;
+
+  if (epubResizeTimer) {
+    clearTimeout(epubResizeTimer);
+    epubResizeTimer = null;
+  }
+
+  if (document.visibilityState === 'hidden') {
+    return;
+  }
+
+  epubResizeTimer = setTimeout(async () => {
+    epubResizeTimer = null;
+    if (document.visibilityState === 'hidden' || !currentRendition) {
+      return;
+    }
+    const cfi = pendingEpubRestoreCfi;
+    pendingEpubRestoreCfi = null;
+    if (!cfi) {
+      isNavigating = false;
+      return;
+    }
+    if (checkCurrentPageFirst && isCfiOnCurrentPage(cfi)) {
+      isNavigating = false;
+      return;
+    }
+    await gotoCFI(cfi, true);
+  }, 200);
+}
+
+async function gotoCFI(cfi, allowPreempt = false) {
+  if (!currentRendition || !cfi || (isNavigating && !allowPreempt)) return;
+
+  const taskId = ++currentEpubNavTaskId;
   isNavigating = true;
   try {
     // First, display the section. This may not be the exact page.
     await currentRendition.display(cfi);
+    if (taskId !== currentEpubNavTaskId) return;
 
     // Now, loop until the target CFI is within the current visible range.
     // We pass skipSave=true to avoid dozens of DB writes.
     let lastCFI = null;
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 500; i++) {
+      if (taskId !== currentEpubNavTaskId) return;
       const currentLocation = currentRendition.currentLocation();
       if (!currentLocation || !currentLocation.start || !currentLocation.end) {
         break;
@@ -1729,10 +1827,13 @@ async function gotoCFI(cfi) {
         break;
       }
     }
+    if (taskId !== currentEpubNavTaskId) return;
     // Perform a single save after the final position is reached.
     await saveLastLocation();
   } finally {
-    isNavigating = false;
+    if (taskId === currentEpubNavTaskId) {
+      isNavigating = false;
+    }
   }
 }
 
@@ -3693,6 +3794,8 @@ function openRendition(bookData, metadata) {
   document.getElementById('line-height-value').textContent = currentLineHeight;
 
   const cfi = metadata ? metadata.lastLocation : null;
+  currentStableEpubCfi = cfi || null;
+  pendingEpubRestoreCfi = null;
 
   elementStyle('book-management').display = 'none';
   const readerView = document.getElementById('reader-view');
@@ -3725,6 +3828,18 @@ function openRendition(bookData, metadata) {
     }
 
     currentRendition = currentBook.renderTo('viewer', renderOptions);
+    currentRendition.onResized = (size, epubcfi) => {
+      currentRendition.emit('resized', {
+        width: size.width,
+        height: size.height
+      }, epubcfi);
+      const targetCfi = epubcfi || pendingEpubRestoreCfi || currentStableEpubCfi ||
+        (currentRendition.location && currentRendition.location.start &&
+         currentRendition.location.start.cfi);
+      if (targetCfi) {
+        scheduleEpubResizeRestore(targetCfi, false);
+      }
+    };
 
     const slider = document.getElementById('progress-slider');
     const currentLabel = document.getElementById('progress-current-label');
@@ -3769,7 +3884,8 @@ function openRendition(bookData, metadata) {
         }
       }
 
-      if (!isNavigating) {
+      if (!isNavigating && document.visibilityState !== 'hidden' &&
+          !pendingEpubRestoreCfi) {
         // Reset TTS chunks when user manually relocates
         if (!isAutoReading) {
           currentChunks = [];
