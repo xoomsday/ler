@@ -98,7 +98,10 @@ the browser's IndexedDB.
           chapter boundaries to overcome library limitations.
     *   **Per-Book Display Settings**:
         *   **For EPUBs**: Font size, line height, and font face
-          (serif/sans-serif) are saved for each book individually.
+          (serif/sans-serif) are saved for each book individually. Newly
+          opened EPUBs automatically adopt the majority display settings
+          from already-configured books on your bookshelf, matching your
+          preferred scale and device resolution.
         *   **For Comics**: The user's preferred reading direction and
           any manual spread overrides ("splits") are saved for each
           comic individually.

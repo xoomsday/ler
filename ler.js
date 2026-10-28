@@ -3390,6 +3390,65 @@ function toggleSelection(bookId, tileElement) {
   updateSelectionCount();
 }
 
+async function getBookshelfEpubDefaults() {
+  const BASE_DEFAULTS = {
+    fontSize: 100,
+    lineHeight: 1.5,
+    font: 'sans-serif'
+  };
+
+  return new Promise((resolve) => {
+    const transaction = db.transaction([STORE_METADATA_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_METADATA_NAME);
+    const request = store.getAll();
+
+    request.onsuccess = () => {
+      const allMetadata = request.result || [];
+
+      // Filter only EPUBs that have explicit settings recorded
+      const configuredEpubs = allMetadata.filter(m =>
+        (m.type === 'epub' || !m.type) && typeof m.fontSize === 'number'
+      );
+
+      if (configuredEpubs.length === 0) {
+        return resolve(BASE_DEFAULTS);
+      }
+
+      // Sort by recency descending so recent books win ties
+      configuredEpubs.sort((a, b) => (b.lastReadTimestamp || 0) - (a.lastReadTimestamp || 0));
+
+      const findMode = (key, fallback) => {
+        const counts = new Map();
+        let maxCount = 0;
+        let modeVal = fallback;
+
+        for (const meta of configuredEpubs) {
+          const val = meta[key];
+          if (val === undefined || val === null) continue;
+          const count = (counts.get(val) || 0) + 1;
+          counts.set(val, count);
+
+          if (count > maxCount) {
+            maxCount = count;
+            modeVal = val;
+          }
+        }
+        return modeVal;
+      };
+
+      resolve({
+        fontSize: findMode('fontSize', BASE_DEFAULTS.fontSize),
+        lineHeight: findMode('lineHeight', BASE_DEFAULTS.lineHeight),
+        font: findMode('font', BASE_DEFAULTS.font)
+      });
+    };
+
+    request.onerror = () => {
+      resolve(BASE_DEFAULTS);
+    };
+  });
+}
+
 function openBook(bookId) {
   if (isSelectionModeActive) return;
   currentBookId = bookId;
@@ -3397,7 +3456,7 @@ function openBook(bookId) {
   Promise.all([
     getFromDB(STORE_BOOKS_NAME, bookId),
     getFromDB(STORE_METADATA_NAME, bookId)
-  ]).then(([bookRecord, metadataRecord]) => {
+  ]).then(async ([bookRecord, metadataRecord]) => {
     let needsUpdate = false;
     if (metadataRecord) {
       // Repair existing data if progress is missing
@@ -3412,18 +3471,43 @@ function openBook(bookId) {
       }
     }
 
-    if (needsUpdate) {
-      const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_METADATA_NAME);
-      store.put(metadataRecord);
-    }
-
     const bookData = bookRecord.data;
     currentBookType = bookRecord.type || 'epub'; // Default to epub for older data
 
     if (currentBookType === 'cbz') {
+      if (needsUpdate) {
+        const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_METADATA_NAME);
+        store.put(metadataRecord);
+      }
       openComicBook(bookRecord, metadataRecord);
     } else {
+      const isMissingSettings = !metadataRecord ||
+        metadataRecord.fontSize === undefined ||
+        metadataRecord.lineHeight === undefined ||
+        metadataRecord.font === undefined;
+
+      if (isMissingSettings) {
+        const defaults = await getBookshelfEpubDefaults();
+        metadataRecord = metadataRecord || { bookId };
+        if (metadataRecord.fontSize === undefined) {
+          metadataRecord.fontSize = defaults.fontSize;
+        }
+        if (metadataRecord.lineHeight === undefined) {
+          metadataRecord.lineHeight = defaults.lineHeight;
+        }
+        if (metadataRecord.font === undefined) {
+          metadataRecord.font = defaults.font;
+        }
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        const transaction = db.transaction([STORE_METADATA_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_METADATA_NAME);
+        store.put(metadataRecord);
+      }
+
       openRendition(bookData, metadataRecord);
     }
   }).catch(error => {
@@ -3779,13 +3863,13 @@ function openRendition(bookData, metadata) {
   currentFont = 'sans-serif';
 
   if (metadata) {
-    if (metadata.fontSize) {
+    if (typeof metadata.fontSize === 'number') {
       currentFontSize = metadata.fontSize;
     }
-    if (metadata.lineHeight) {
+    if (typeof metadata.lineHeight === 'number') {
       currentLineHeight = metadata.lineHeight;
     }
-    if (metadata.font) {
+    if (typeof metadata.font === 'string') {
       currentFont = metadata.font;
     }
   }
